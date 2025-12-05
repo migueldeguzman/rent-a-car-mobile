@@ -339,7 +339,7 @@ content: {
 
 ```bash
 # Backend must be running on port 3001
-cd C:\Users\DELL\vesla-audit\client-app\rent-a-car-app\backend
+cd C:\Users\DELL\vesla-audit\rent-a-car-mobile\backend
 npm run dev
 ```
 
@@ -445,7 +445,7 @@ npx expo start --web
 rent-a-car-mobile/
 ├── App.tsx                           # Root component with Navigation + CustomScrollbar
 ├── app.json                          # Expo configuration
-├── package.json                      # Dependencies
+├── package.json                      # Mobile app dependencies
 ├── web/
 │   └── index.html                    # Native scrollbar CSS styling
 ├── src/
@@ -466,6 +466,33 @@ rent-a-car-mobile/
 │   │   └── colors.ts                 # Color palette and financial utilities
 │   └── types/
 │       └── index.ts                  # TypeScript interfaces
+├── backend/                          # Consolidated backend server
+│   ├── .env                          # Environment configuration
+│   ├── package.json                  # Backend dependencies
+│   └── src/
+│       ├── index.ts                  # Express server entry point
+│       ├── config/
+│       │   └── env.ts                # Environment variable loading
+│       ├── controllers/
+│       │   ├── auth.controller.ts    # Authentication logic
+│       │   ├── booking.controller.ts # Booking operations
+│       │   ├── customer.controller.ts# Customer management
+│       │   ├── invoice.controller.ts # Invoice generation
+│       │   └── vehicle.controller.ts # Vehicle CRUD
+│       ├── middleware/
+│       │   └── auth.middleware.ts    # JWT verification
+│       ├── models/
+│       │   └── database.ts           # PostgreSQL connection & schema
+│       ├── routes/
+│       │   ├── auth.routes.ts        # /api/auth/*
+│       │   ├── booking.routes.ts     # /api/bookings/*
+│       │   ├── customer.routes.ts    # /api/customers/*
+│       │   ├── invoice.routes.ts     # /api/invoices/*
+│       │   └── vehicle.routes.ts     # /api/vehicles/*
+│       ├── scripts/
+│       │   └── seed-vehicles.ts      # Database seeding
+│       └── utils/
+│           └── accounts.ts           # Account utilities
 └── CLAUDE.md                         # This file
 ```
 
@@ -473,51 +500,65 @@ rent-a-car-mobile/
 
 ## Environment Variables
 
-**Backend Configuration:**
-- Database: PostgreSQL on port 5433
-- API Port: 3001
-- CORS Origin: `http://localhost:5173,http://localhost:19000,http://localhost:8085`
+**Backend Configuration (`backend/.env`):**
+```env
+# Server
+PORT=3001
+NODE_ENV=development
 
-**No .env file needed in mobile app** - API URL hardcoded to `http://localhost:3001/api`
+# Database (Neon PostgreSQL)
+DATABASE_URL=postgresql://neondb_owner:npg_sS6Le8DNvBqx@ep-still-recipe-a9gv66gx-pooler.gwc.azure.neon.tech/neondb?sslmode=require
+
+# Authentication
+JWT_SECRET=your-super-secret-jwt-key-change-this-in-production-min-32-chars
+JWT_EXPIRES_IN=7d
+
+# CORS
+CORS_ORIGIN=http://localhost:5173,http://localhost:19000,http://localhost:8081,http://localhost:8085
+
+# App Settings
+APP_NAME=Vesla Rent-a-Car
+VAT_RATE=5
+SECURITY_DEPOSIT_PERCENTAGE=20
+```
+
+**Mobile App:**
+- No .env file needed
+- API URL hardcoded to `http://localhost:3001/api` in `src/services/api.ts`
 
 ---
 
 ## Dependencies
 
-**Core:**
-```json
-{
-  "react": "18.2.0",
-  "react-native": "0.74.5",
-  "expo": "~51.0.28",
-  "typescript": "~5.3.3"
-}
-```
+**Mobile App (`package.json`):**
+- React Native + Expo stack
+- React Navigation for routing
+- Axios for API calls
+- AsyncStorage for local persistence
+- Linear Gradient for UI styling
 
-**Navigation:**
+**Backend (`backend/package.json`):**
 ```json
 {
-  "@react-navigation/native": "^6.1.18",
-  "@react-navigation/stack": "^6.4.1",
-  "react-native-screens": "~3.31.1",
-  "react-native-safe-area-context": "4.10.5"
-}
-```
-
-**API & Storage:**
-```json
-{
-  "axios": "^1.7.7",
-  "@react-native-async-storage/async-storage": "1.23.1"
-}
-```
-
-**UI Components:**
-```json
-{
-  "expo-linear-gradient": "~13.0.2",
-  "@react-native-community/datetimepicker": "8.0.1",
-  "@expo/vector-icons": "^14.0.2"
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "cors": "^2.8.5",
+    "date-fns": "^3.0.6",
+    "dotenv": "^16.4.5",
+    "express": "^4.18.2",
+    "jsonwebtoken": "^9.0.3",
+    "pg": "^8.11.3"
+  },
+  "devDependencies": {
+    "@types/bcrypt": "^6.0.0",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^20.11.5",
+    "@types/pg": "^8.10.9",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3"
+  }
 }
 ```
 

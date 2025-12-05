@@ -5,3 +5,26 @@ testuser2@example.com
 password123
 
 Email: testuser@vesla.com Password: test123
+
+_________________________________________________________________________________
+
+
+  Backend Server (Rent-a-Car API):
+  cd C:\Users\DELL\vesla-audit\rent-a-car-mobile\client-app\rent-a-car-app\backend
+  npm run dev
+
+  Mobile/Web App (Expo):
+  cd C:\Users\DELL\vesla-audit\rent-a-car-mobile
+  npx expo start --port 8085 --clear
+
+  Optional - If you want to run ERP backend too:
+  cd C:\Users\DELL\vesla-audit\web-erp-app\backend
+  npm run dev
+
+  Quick Check - See what's currently running:
+  You can check the background bash processes using the /bashes command to see what's already active.
+
+  Access URLs once running:
+  - Mobile/Web App: http://localhost:8085
+  - Rent-a-Car Backend: http://localhost:3001/api
+  - ERP Backend: http://localhost:3000/api

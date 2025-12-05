@@ -10,7 +10,22 @@
       "Bash(npm install)",
       "Bash(curl:*)",
       "Read(//c/Users/DELL/vesla-audit/**)",
-      "Bash(npm run check-users:*)"
+      "Bash(npm run check-users:*)",
+      "Bash(cp:*)",
+      "Bash(tasklist)",
+      "Bash(npm run dev)",
+      "Read(//c/**)",
+      "Bash(git init:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nInitial commit: Vesla Rent-a-Car Backend API\n\n- Express.js + TypeScript server\n- PostgreSQL database (Neon cloud)\n- JWT authentication with bcrypt\n- REST API endpoints for:\n  * Authentication (register/login)\n  * Vehicles (CRUD + availability)\n  * Bookings (create/confirm/list)\n  * Invoices (generate/retrieve)\n  * Customers (manage profiles)\n- Auto-initializing database schema\n- Environment-based configuration\n- CORS enabled for mobile/web clients\n\nServer runs on port 3001\nDatabase: Neon PostgreSQL serverless\n\n🤖 Generated with Claude Code\nEOF\n)\")",
+      "Bash(git remote add:*)",
+      "Bash(git branch:*)",
+      "Bash(git push:*)",
+      "Bash(netstat:*)",
+      "Bash(taskkill:*)",
+      "Bash(awk:*)",
+      "Bash(rm:*)",
+      "Bash(rmdir:*)"
     ],
     "deny": [],
     "ask": []
