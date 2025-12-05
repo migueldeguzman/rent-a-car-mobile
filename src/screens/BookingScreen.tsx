@@ -234,27 +234,43 @@ export default function BookingScreen({ navigation, route }: BookingScreenProps)
   };
 
   const handleBooking = async () => {
+    console.log('🚗 Booking button clicked');
+
     if (startDate >= endDate) {
-      Alert.alert('Invalid Dates', 'End date must be after start date');
+      const msg = 'End date must be after start date';
+      console.error('❌ Invalid dates:', msg);
+      if (Platform.OS === 'web') {
+        window.alert('Invalid Dates: ' + msg);
+      } else {
+        Alert.alert('Invalid Dates', msg);
+      }
       return;
     }
 
     if (!validateMinimumPeriod()) {
+      console.log('❌ Minimum period validation failed');
       return;
     }
 
     if (!termsAccepted) {
-      Alert.alert('Terms & Conditions', 'Please accept the terms and conditions to proceed');
+      const msg = 'Please accept the terms and conditions to proceed';
+      console.error('❌ Terms not accepted');
+      if (Platform.OS === 'web') {
+        window.alert('Terms & Conditions: ' + msg);
+      } else {
+        Alert.alert('Terms & Conditions', msg);
+      }
       return;
     }
+
+    console.log('✅ All validations passed, showing confirmation dialog');
 
     const selectedAddOns = addOns.filter(addon => addon.selected);
     const addOnsText = selectedAddOns.length > 0
       ? `\n\nAdd-ons:\n${selectedAddOns.map(a => `• ${a.name}: ${financialFormatting.formatCurrency(a.dailyRate)}/day`).join('\n')}`
       : '';
 
-    Alert.alert(
-      'Confirm Booking',
+    const confirmMessage =
       `Book ${vehicle.make} ${vehicle.model} for ${rateCalculation.totalDays} days?\n\n` +
       `Rental Mode: ${rentalMode}\n` +
       `Subtotal: ${financialFormatting.formatCurrency(priceBreakdown.subtotal)}\n` +
@@ -262,12 +278,23 @@ export default function BookingScreen({ navigation, route }: BookingScreenProps)
       `VAT (5%): ${financialFormatting.formatCurrency(priceBreakdown.vatAmount)}\n` +
       `Total: ${financialFormatting.formatCurrency(priceBreakdown.totalWithVat)}\n\n` +
       `Security Deposit: ${financialFormatting.formatCurrency(priceBreakdown.securityDeposit)}\n` +
-      `Payment Method: ${paymentMethod.replace('_', ' ')}`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Confirm',
-          onPress: async () => {
+      `Payment Method: ${paymentMethod.replace('_', ' ')}`;
+
+    const confirmed = Platform.OS === 'web'
+      ? window.confirm(confirmMessage)
+      : await new Promise<boolean>((resolve) => {
+          Alert.alert(
+            'Confirm Booking',
+            confirmMessage,
+            [
+              { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+              { text: 'Confirm', onPress: () => resolve(true) },
+            ]
+          );
+        });
+
+    if (confirmed) {
+      const processBooking = async () => {
             setIsLoading(true);
             try {
               // Prepare booking data with all new fields
@@ -297,14 +324,28 @@ export default function BookingScreen({ navigation, route }: BookingScreenProps)
                 priceBreakdown,
               });
             } catch (error: any) {
-              Alert.alert('Booking Failed', error.response?.data?.message || 'Could not create booking');
+              console.error('❌ Booking error:', error);
+              console.error('Error response:', error.response?.data);
+              console.error('Error message:', error.message);
+
+              const errorMessage = error.response?.data?.message || error.message || 'Could not create booking. Please try again.';
+
+              if (Platform.OS === 'web') {
+                window.alert('Booking Failed: ' + errorMessage);
+              } else {
+                Alert.alert(
+                  'Booking Failed',
+                  errorMessage,
+                  [{ text: 'OK', style: 'default' }]
+                );
+              }
             } finally {
               setIsLoading(false);
             }
-          },
-        },
-      ]
-    );
+      };
+
+      await processBooking();
+    }
   };
 
   const openTermsAndConditions = () => {
@@ -681,14 +722,25 @@ export default function BookingScreen({ navigation, route }: BookingScreenProps)
         <View style={styles.termsContainer}>
           <TouchableOpacity
             style={styles.termsCheckbox}
-            onPress={() => setTermsAccepted(!termsAccepted)}
+            onPress={() => {
+              console.log('📋 Terms checkbox clicked! Current:', termsAccepted);
+              setTermsAccepted(!termsAccepted);
+              console.log('📋 Terms set to:', !termsAccepted);
+            }}
+            activeOpacity={0.7}
           >
             <View style={[styles.checkbox, termsAccepted && styles.checkboxActive]}>
               {termsAccepted && <Ionicons name="checkmark" size={16} color={colors.neutral.white} />}
             </View>
             <Text style={styles.termsText}>
               I agree to the{' '}
-              <Text style={styles.termsLink} onPress={openTermsAndConditions}>
+              <Text
+                style={styles.termsLink}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  openTermsAndConditions();
+                }}
+              >
                 Terms & Conditions
               </Text>
               {' '}and understand that the total amount of{' '}
