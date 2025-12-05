@@ -86,17 +86,17 @@ export const authAPI = {
 // Vehicle APIs
 export const vehicleAPI = {
   getAvailableVehicles: async (companyId: string): Promise<Vehicle[]> => {
-    const response = await api.get<Vehicle[]>(
+    const response = await api.get<{ success: boolean; data: Vehicle[]; count: number }>(
       `/vehicles/available?companyId=${companyId}`
     );
-    return response.data;
+    return response.data.data;
   },
 
   getVehicleById: async (vehicleId: string): Promise<Vehicle> => {
-    const response = await api.get<Vehicle>(
+    const response = await api.get<{ success: boolean; data: Vehicle }>(
       `/vehicles/${vehicleId}`
     );
-    return response.data;
+    return response.data.data;
   },
 
   checkAvailability: async (
