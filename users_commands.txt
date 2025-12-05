@@ -1,0 +1,7 @@
+Email: admin@vesla.com
+Password: admin123
+
+testuser2@example.com
+password123
+
+Email: testuser@vesla.com Password: test123

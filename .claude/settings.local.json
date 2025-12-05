@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir:*)",
+      "Bash(psql:*)",
+      "Bash(npm install pg)",
+      "Bash(node:*)",
+      "Bash(npx tsx:*)",
+      "Bash(npm install pg dotenv)",
+      "Bash(npm install)",
+      "Bash(curl:*)",
+      "Read(//c/Users/DELL/vesla-audit/**)",
+      "Bash(npm run check-users:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

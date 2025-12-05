@@ -1,0 +1,19 @@
+{
+  "name": "vesla-database-deployment",
+  "version": "1.0.0",
+  "description": "Deployment scripts for Vesla Rent-a-Car database",
+  "scripts": {
+    "deploy": "node deploy-to-neon.js",
+    "test": "node test-workflow.js"
+  },
+  "keywords": [
+    "neon",
+    "postgresql",
+    "deployment"
+  ],
+  "author": "Vesla Team",
+  "license": "ISC",
+  "dependencies": {
+    "pg": "^8.16.3"
+  }
+}
