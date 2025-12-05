@@ -13,6 +13,30 @@ Mobile-first car rental application built with React Native and Expo, supporting
 
 **Working Directory:** `C:\Users\DELL\vesla-audit\rent-a-car-mobile`
 
+**GitHub Repository:** https://github.com/migueldeguzman/rent-a-car-mobile.git
+
+---
+
+## Version Control
+
+**Git Commands:**
+```bash
+# Check status
+git status
+
+# Stage changes
+git add .
+
+# Commit changes
+git commit -m "Description of changes"
+
+# Push to GitHub
+git push
+
+# View commit history
+git log --oneline -5
+```
+
 ---
 
 ## Architecture
