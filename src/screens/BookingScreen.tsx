@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Vehicle, AddOn, NotificationPreferences, PriceBreakdown } from '../types';
+import { Vehicle, AddOn, PriceBreakdown } from '../types';
 import { useBookingFlow } from '../contexts/BookingFlowContext';
 import { colors, gradients, financialFormatting } from '../theme/colors';
 import { Ionicons } from '@expo/vector-icons';
@@ -52,11 +52,6 @@ export default function BookingScreen({ navigation, route }: BookingScreenProps)
 
   // Week 3 states
   const [addOns, setAddOns] = useState<AddOn[]>(DEFAULT_ADDONS);
-  const [notificationPrefs, setNotificationPrefs] = useState<NotificationPreferences>({
-    email: true,
-    sms: false,
-    whatsapp: false,
-  });
 
   // Monthly discount tiers
   const getMonthlyRateForPeriod = (months: number): number => {
@@ -265,73 +260,41 @@ export default function BookingScreen({ navigation, route }: BookingScreenProps)
       return;
     }
 
-    console.log('✅ All validations passed, showing confirmation dialog');
+    console.log('✅ All validations passed, proceeding to KYC');
 
-    const selectedAddOns = addOns.filter(addon => addon.selected);
-    const addOnsText = selectedAddOns.length > 0
-      ? `\n\nAdd-ons:\n${selectedAddOns.map(a => `• ${a.name}: ${financialFormatting.formatCurrency(a.dailyRate)}/month`).join('\n')}`
-      : '';
+    setIsLoading(true);
+    try {
+      // Save Step 1 data to BookingFlowContext
+      const selectedAddOns = addOns.filter(addon => addon.selected);
 
-    const periodLabel = selectedPeriod === '1_MONTH' ? '1 Month' :
-                        selectedPeriod === '3_MONTHS' ? '3 Months' :
-                        selectedPeriod === '6_MONTHS' ? '6 Months' : 'Custom Period';
+      setVehicleSelection(
+        vehicle,
+        {
+          startDate: startDate.toISOString(),
+          endDate: endDate.toISOString(),
+          totalDays: rateCalculation.totalDays,
+          monthlyPeriods: rateCalculation.months,
+          remainingDays: rateCalculation.totalDays % 30,
+        },
+        selectedAddOns,
+        priceBreakdown
+      );
 
-    const confirmMessage =
-      `Book ${vehicle.make} ${vehicle.model} for ${rateCalculation.totalDays} days?\n\n` +
-      `Rental Period: ${periodLabel}\n` +
-      `Subtotal: ${financialFormatting.formatCurrency(priceBreakdown.subtotal)}\n` +
-      `Add-ons: ${financialFormatting.formatCurrency(priceBreakdown.addOnsTotal || 0)}${addOnsText}\n` +
-      `VAT (5%): ${financialFormatting.formatCurrency(priceBreakdown.vatAmount)}\n` +
-      `Total: ${financialFormatting.formatCurrency(priceBreakdown.totalWithVat)}`;
+      console.log('✅ Vehicle selection saved to context');
 
-    const confirmed = Platform.OS === 'web'
-      ? window.confirm(confirmMessage)
-      : await new Promise<boolean>((resolve) => {
-          Alert.alert(
-            'Confirm Booking',
-            confirmMessage,
-            [
-              { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
-              { text: 'Confirm', onPress: () => resolve(true) },
-            ]
-          );
-        });
+      // Move to Step 2: KYC/Eligibility
+      nextStep();
+      navigation.navigate('KYCEligibility');
+    } catch (error: any) {
+      console.error('❌ Error saving vehicle selection:', error);
 
-    if (confirmed) {
-      setIsLoading(true);
-      try {
-        // Save Step 1 data to BookingFlowContext
-        const selectedAddOns = addOns.filter(addon => addon.selected);
-
-        setVehicleSelection(
-          vehicle,
-          {
-            startDate: startDate.toISOString(),
-            endDate: endDate.toISOString(),
-            totalDays: rateCalculation.totalDays,
-            monthlyPeriods: rateCalculation.months,
-            remainingDays: rateCalculation.totalDays % 30,
-          },
-          selectedAddOns,
-          priceBreakdown
-        );
-
-        console.log('✅ Vehicle selection saved to context');
-
-        // Move to Step 2: KYC/Eligibility
-        nextStep();
-        navigation.navigate('KYCEligibility');
-      } catch (error: any) {
-        console.error('❌ Error saving vehicle selection:', error);
-
-        if (Platform.OS === 'web') {
-          window.alert('Error: Could not proceed to next step');
-        } else {
-          Alert.alert('Error', 'Could not proceed to next step');
-        }
-      } finally {
-        setIsLoading(false);
+      if (Platform.OS === 'web') {
+        window.alert('Error: Could not proceed to next step');
+      } else {
+        Alert.alert('Error', 'Could not proceed to next step');
       }
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -608,40 +571,6 @@ export default function BookingScreen({ navigation, route }: BookingScreenProps)
               </Text>
             </TouchableOpacity>
           ))}
-        </View>
-
-        {/* Notification Preferences */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Notification Preferences</Text>
-          <View style={styles.notificationContainer}>
-            <View style={styles.notificationOption}>
-              <Text style={styles.notificationText}>Email</Text>
-              <Switch
-                value={notificationPrefs.email}
-                onValueChange={(value) => setNotificationPrefs(prev => ({ ...prev, email: value }))}
-                trackColor={{ false: colors.neutral.border, true: colors.primary.light }}
-                thumbColor={notificationPrefs.email ? colors.primary.main : colors.neutral.text.secondary}
-              />
-            </View>
-            <View style={styles.notificationOption}>
-              <Text style={styles.notificationText}>SMS</Text>
-              <Switch
-                value={notificationPrefs.sms}
-                onValueChange={(value) => setNotificationPrefs(prev => ({ ...prev, sms: value }))}
-                trackColor={{ false: colors.neutral.border, true: colors.primary.light }}
-                thumbColor={notificationPrefs.sms ? colors.primary.main : colors.neutral.text.secondary}
-              />
-            </View>
-            <View style={styles.notificationOption}>
-              <Text style={styles.notificationText}>WhatsApp</Text>
-              <Switch
-                value={notificationPrefs.whatsapp}
-                onValueChange={(value) => setNotificationPrefs(prev => ({ ...prev, whatsapp: value }))}
-                trackColor={{ false: colors.neutral.border, true: colors.primary.light }}
-                thumbColor={notificationPrefs.whatsapp ? colors.primary.main : colors.neutral.text.secondary}
-              />
-            </View>
-          </View>
         </View>
 
         {/* Price Breakdown with VAT */}
@@ -992,21 +921,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: colors.primary.main,
-  },
-  notificationContainer: {
-    backgroundColor: colors.ui.cardBackground,
-    borderRadius: 8,
-    padding: 12,
-  },
-  notificationOption: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  notificationText: {
-    fontSize: 14,
-    color: colors.neutral.text.primary,
   },
   priceCard: {
     backgroundColor: colors.ui.cardBackground,

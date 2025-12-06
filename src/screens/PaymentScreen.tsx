@@ -9,13 +9,14 @@ import {
   Alert,
   ActivityIndicator,
   TextInput,
+  Switch,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, gradients, financialFormatting } from '../theme/colors';
 import { useBookingFlow } from '../contexts/BookingFlowContext';
 import { useAuth } from '../contexts/AuthContext';
-import { PaymentData, AccountingEntry } from '../types';
+import { PaymentData, AccountingEntry, NotificationPreferences } from '../types';
 import ProgressIndicator from '../components/ProgressIndicator';
 
 interface PaymentScreenProps {
@@ -29,6 +30,13 @@ export default function PaymentScreen({ navigation }: PaymentScreenProps) {
   const [paymentMethod, setPaymentMethod] = useState<'CREDIT_CARD' | 'DEBIT_CARD' | 'BANK_TRANSFER' | 'CASH'>('CREDIT_CARD');
   const [isProcessing, setIsProcessing] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
+
+  // Notification preferences
+  const [notificationPrefs, setNotificationPrefs] = useState<NotificationPreferences>({
+    email: true,
+    sms: false,
+    whatsapp: false,
+  });
 
   // Card details for final confirmation (last 4 digits from KYC)
   const cardLast4 = flowState.kycData?.creditCardNumber || '****';
@@ -350,6 +358,52 @@ export default function PaymentScreen({ navigation }: PaymentScreenProps) {
               </View>
             </View>
           )}
+
+          {/* Notification Preferences */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Notification Preferences</Text>
+            <Text style={styles.sectionSubtitle}>
+              Choose how you'd like to receive booking updates and confirmations
+            </Text>
+            <View style={styles.notificationContainer}>
+              <View style={styles.notificationOption}>
+                <View style={styles.notificationLabelContainer}>
+                  <Ionicons name="mail" size={20} color={colors.primary.main} />
+                  <Text style={styles.notificationText}>Email</Text>
+                </View>
+                <Switch
+                  value={notificationPrefs.email}
+                  onValueChange={(value) => setNotificationPrefs(prev => ({ ...prev, email: value }))}
+                  trackColor={{ false: colors.neutral.border, true: colors.primary.light }}
+                  thumbColor={notificationPrefs.email ? colors.primary.main : colors.neutral.text.secondary}
+                />
+              </View>
+              <View style={styles.notificationOption}>
+                <View style={styles.notificationLabelContainer}>
+                  <Ionicons name="chatbubble" size={20} color={colors.primary.main} />
+                  <Text style={styles.notificationText}>SMS</Text>
+                </View>
+                <Switch
+                  value={notificationPrefs.sms}
+                  onValueChange={(value) => setNotificationPrefs(prev => ({ ...prev, sms: value }))}
+                  trackColor={{ false: colors.neutral.border, true: colors.primary.light }}
+                  thumbColor={notificationPrefs.sms ? colors.primary.main : colors.neutral.text.secondary}
+                />
+              </View>
+              <View style={styles.notificationOption}>
+                <View style={styles.notificationLabelContainer}>
+                  <Ionicons name="logo-whatsapp" size={20} color={colors.primary.main} />
+                  <Text style={styles.notificationText}>WhatsApp</Text>
+                </View>
+                <Switch
+                  value={notificationPrefs.whatsapp}
+                  onValueChange={(value) => setNotificationPrefs(prev => ({ ...prev, whatsapp: value }))}
+                  trackColor={{ false: colors.neutral.border, true: colors.primary.light }}
+                  thumbColor={notificationPrefs.whatsapp ? colors.primary.main : colors.neutral.text.secondary}
+                />
+              </View>
+            </View>
+          </View>
 
           {/* Terms and Conditions */}
           <View style={styles.termsContainer}>
@@ -726,5 +780,37 @@ const styles = StyleSheet.create({
     color: colors.neutral.white,
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  // Notification Preferences Styles
+  sectionSubtitle: {
+    fontSize: 13,
+    color: colors.neutral.text.secondary,
+    marginBottom: 12,
+    marginTop: -8,
+  },
+  notificationContainer: {
+    backgroundColor: colors.ui.cardBackground,
+    borderRadius: 12,
+    padding: 16,
+    ...colors.shadows.small,
+  },
+  notificationOption: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.neutral.divider,
+  },
+  notificationLabelContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  notificationText: {
+    fontSize: 15,
+    color: colors.neutral.text.primary,
+    fontWeight: '500',
   },
 });

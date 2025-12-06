@@ -179,6 +179,81 @@ export default function KYCEligibilityScreen({ navigation }: KYCEligibilityScree
             </Text>
           </View>
 
+          {/* Booking Summary Section */}
+          {flowState.vehicle && flowState.priceBreakdown && (
+            <View style={styles.summaryCard}>
+              <View style={styles.summaryHeader}>
+                <Ionicons name="car-sport" size={24} color={colors.primary.main} />
+                <Text style={styles.summaryTitle}>Booking Summary</Text>
+              </View>
+
+              <View style={styles.summaryContent}>
+                {/* Vehicle Info */}
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Vehicle:</Text>
+                  <Text style={styles.summaryValue}>
+                    {flowState.vehicle.make} {flowState.vehicle.model} {flowState.vehicle.year}
+                  </Text>
+                </View>
+
+                {/* Rental Period */}
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Period:</Text>
+                  <Text style={styles.summaryValue}>
+                    {flowState.rentalPeriod?.totalDays} days
+                    {flowState.rentalPeriod?.monthlyPeriods ? ` (${flowState.rentalPeriod.monthlyPeriods} month${flowState.rentalPeriod.monthlyPeriods > 1 ? 's' : ''})` : ''}
+                  </Text>
+                </View>
+
+                {/* Dates */}
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Dates:</Text>
+                  <Text style={styles.summaryValueSmall}>
+                    {flowState.rentalPeriod?.startDate ? new Date(flowState.rentalPeriod.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''} - {flowState.rentalPeriod?.endDate ? new Date(flowState.rentalPeriod.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''}
+                  </Text>
+                </View>
+
+                {/* Add-ons */}
+                {flowState.selectedAddOns && flowState.selectedAddOns.length > 0 && (
+                  <View style={styles.summaryRow}>
+                    <Text style={styles.summaryLabel}>Add-ons:</Text>
+                    <View style={styles.summaryAddOns}>
+                      {flowState.selectedAddOns.map((addon, index) => (
+                        <Text key={index} style={styles.summaryAddOnText}>
+                          • {addon.name}
+                        </Text>
+                      ))}
+                    </View>
+                  </View>
+                )}
+
+                <View style={styles.summaryDivider} />
+
+                {/* Pricing */}
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Subtotal:</Text>
+                  <Text style={styles.summaryValue}>
+                    {financialFormatting.formatCurrency(flowState.priceBreakdown.subtotal + (flowState.priceBreakdown.addOnsTotal || 0))}
+                  </Text>
+                </View>
+
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabelVat}>VAT (5%):</Text>
+                  <Text style={styles.summaryValueVat}>
+                    {financialFormatting.formatCurrency(flowState.priceBreakdown.vatAmount)}
+                  </Text>
+                </View>
+
+                <View style={[styles.summaryRow, styles.summaryTotalRow]}>
+                  <Text style={styles.summaryTotalLabel}>Total Amount:</Text>
+                  <Text style={styles.summaryTotalValue}>
+                    {financialFormatting.formatCurrency(flowState.priceBreakdown.totalWithVat)}
+                  </Text>
+                </View>
+              </View>
+            </View>
+          )}
+
           {/* Verification Method Selection */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Verification Method</Text>
@@ -787,5 +862,100 @@ const styles = StyleSheet.create({
     color: colors.neutral.white,
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  // Booking Summary Styles
+  summaryCard: {
+    backgroundColor: colors.ui.cardBackground,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 24,
+    borderWidth: 2,
+    borderColor: colors.primary.main + '30',
+    ...colors.shadows.medium,
+  },
+  summaryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    gap: 8,
+  },
+  summaryTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.primary.main,
+  },
+  summaryContent: {
+    gap: 8,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    paddingVertical: 6,
+  },
+  summaryLabel: {
+    fontSize: 14,
+    color: colors.neutral.text.secondary,
+    flex: 1,
+  },
+  summaryValue: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: colors.neutral.text.primary,
+    flex: 1,
+    textAlign: 'right',
+  },
+  summaryValueSmall: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: colors.neutral.text.primary,
+    flex: 1,
+    textAlign: 'right',
+  },
+  summaryAddOns: {
+    flex: 1,
+    alignItems: 'flex-end',
+  },
+  summaryAddOnText: {
+    fontSize: 13,
+    color: colors.neutral.text.secondary,
+    textAlign: 'right',
+  },
+  summaryDivider: {
+    height: 1,
+    backgroundColor: colors.neutral.divider,
+    marginVertical: 8,
+  },
+  summaryLabelVat: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: colors.financial.vat,
+    flex: 1,
+  },
+  summaryValueVat: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.financial.vat,
+    flex: 1,
+    textAlign: 'right',
+  },
+  summaryTotalRow: {
+    borderTopWidth: 2,
+    borderTopColor: colors.neutral.divider,
+    paddingTop: 12,
+    marginTop: 4,
+  },
+  summaryTotalLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.neutral.text.primary,
+    flex: 1,
+  },
+  summaryTotalValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: colors.primary.main,
+    flex: 1,
+    textAlign: 'right',
   },
 });
