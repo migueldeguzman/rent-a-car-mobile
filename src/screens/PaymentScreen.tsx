@@ -18,7 +18,7 @@ import { useBookingFlow } from '../contexts/BookingFlowContext';
 import { useAuth } from '../contexts/AuthContext';
 import { PaymentData, AccountingEntry, NotificationPreferences } from '../types';
 import ProgressIndicator from '../components/ProgressIndicator';
-import { customerAPI } from '../services/api';
+import { customerAPI, bookingAPI } from '../services/api';
 
 interface PaymentScreenProps {
   navigation: any;
@@ -227,8 +227,19 @@ export default function PaymentScreen({ navigation }: PaymentScreenProps) {
       // Save payment and accounting entry to flow state
       setPaymentData(payment, accountingEntry);
 
-      // In production, send this to backend:
-      // await paymentAPI.processPayment({ payment, accountingEntry, kycData: flowState.kycData });
+      // CRITICAL: Create booking in database
+      console.log('📝 Creating booking in database...');
+      const booking = await bookingAPI.createBooking({
+        vehicleId: flowState.vehicle?.id || '',
+        startDate: flowState.rentalPeriod?.startDate || '',
+        endDate: flowState.rentalPeriod?.endDate || '',
+        paymentMethod: paymentMethod as 'CASH' | 'CREDIT_CARD' | 'BANK_TRANSFER',
+        termsAccepted: true,
+        addOns: flowState.selectedAddOns || [],
+        notificationPreferences: notificationPrefs,
+        notes: `Payment Receipt: ${receiptNumber}`,
+      });
+      console.log('✅ Booking created successfully:', booking.id);
 
       // Move to Step 4: Confirmation
       nextStep();
@@ -236,11 +247,12 @@ export default function PaymentScreen({ navigation }: PaymentScreenProps) {
 
     } catch (error: any) {
       console.error('Payment processing error:', error);
-      Alert.alert(
-        'Payment Failed',
-        error.message || 'Unable to process payment. Please try again.',
-        [{ text: 'OK' }]
-      );
+      const errorMsg = error.response?.data?.message || error.message || 'Unable to process payment. Please try again.';
+      if (Platform.OS === 'web') {
+        window.alert(`Payment Failed: ${errorMsg}`);
+      } else {
+        Alert.alert('Payment Failed', errorMsg, [{ text: 'OK' }]);
+      }
     } finally {
       setIsProcessing(false);
     }
