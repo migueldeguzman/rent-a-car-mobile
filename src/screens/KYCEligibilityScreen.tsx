@@ -80,6 +80,9 @@ export default function KYCEligibilityScreen({ navigation }: KYCEligibilityScree
   const [showBankPicker, setShowBankPicker] = useState(false);
   const [showCardTypePicker, setShowCardTypePicker] = useState(false);
 
+  // Field validation errors
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
   const handleUAEPassVerification = async () => {
     setIsProcessing(true);
     try {
@@ -99,53 +102,135 @@ export default function KYCEligibilityScreen({ navigation }: KYCEligibilityScree
   };
 
   const validateForm = (): boolean => {
+    const errors: Record<string, string> = {};
+    const errorMessages: string[] = [];
+
+    // Phone Number
     if (!phoneNumber || phoneNumber.length < 7) {
-      Alert.alert('Validation Error', 'Please enter a valid phone number');
-      return false;
+      errors.phoneNumber = 'Valid phone number required (min 7 digits)';
+      errorMessages.push('Phone number');
     }
 
+    // Tourist vs Resident validation
     if (isTourist) {
-      if (!passportNumber || !passportCountry) {
-        Alert.alert('Validation Error', 'Please provide passport number and country for tourists');
-        return false;
+      if (!passportNumber) {
+        errors.passportNumber = 'Passport number required for tourists';
+        errorMessages.push('Passport number');
+      }
+      if (!passportCountry) {
+        errors.passportCountry = 'Passport country required';
+        errorMessages.push('Passport country');
       }
     } else {
       if (!emiratesId) {
-        Alert.alert('Validation Error', 'Please provide Emirates ID for UAE residents');
-        return false;
+        errors.emiratesId = 'Emirates ID required for UAE residents';
+        errorMessages.push('Emirates ID');
       }
     }
 
-    if (!driversId || !driversLicenseCountry) {
-      Alert.alert('Validation Error', 'Please provide driver license details (required for all renters)');
-      return false;
+    // Driver's License
+    if (!driversId) {
+      errors.driversId = 'Driver license number required';
+      errorMessages.push('Driver license number');
+    }
+    if (!driversLicenseCountry) {
+      errors.driversLicenseCountry = 'License issuing country required';
+      errorMessages.push('License country');
     }
 
+    // Nationality
     if (!nationality) {
-      Alert.alert('Validation Error', 'Please select your nationality');
-      return false;
+      errors.nationality = 'Nationality required';
+      errorMessages.push('Nationality');
     }
 
+    // Credit Card
     const expectedLength = getCardLength(creditCardType);
-    if (!creditCardNumber || creditCardNumber.length !== expectedLength) {
-      Alert.alert(
-        'Validation Error',
-        `Please enter a complete ${creditCardType} card number (${expectedLength} digits)`
-      );
-      return false;
+    if (!creditCardNumber) {
+      errors.creditCardNumber = 'Card number required';
+      errorMessages.push('Card number');
+    } else if (creditCardNumber.length !== expectedLength) {
+      errors.creditCardNumber = `${creditCardType} requires ${expectedLength} digits`;
+      errorMessages.push('Card number (incomplete)');
     }
 
+    // Cardholder Name
     if (!cardHolderName) {
-      Alert.alert('Validation Error', 'Please enter the cardholder name');
-      return false;
+      errors.cardHolderName = 'Cardholder name required';
+      errorMessages.push('Cardholder name');
     }
 
+    // Bank Provider
     if (!bankProvider) {
-      Alert.alert('Validation Error', 'Please select your bank/service provider');
+      errors.bankProvider = 'Bank/service provider required';
+      errorMessages.push('Bank provider');
+    }
+
+    setFieldErrors(errors);
+
+    if (errorMessages.length > 0) {
+      // Show toast-style message
+      const message = `Please complete: ${errorMessages.join(', ')}`;
+      if (Platform.OS === 'web') {
+        // For web, use a custom toast
+        showToast(message);
+      } else {
+        Alert.alert('Incomplete Information', message);
+      }
       return false;
     }
 
     return true;
+  };
+
+  // Toast message for web
+  const showToast = (message: string) => {
+    // Create toast element
+    const toast = document.createElement('div');
+    toast.textContent = message;
+    toast.style.cssText = `
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: #f44336;
+      color: white;
+      padding: 16px 24px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      z-index: 999999;
+      max-width: 80%;
+      text-align: center;
+      font-size: 14px;
+      animation: slideDown 0.3s ease-out;
+    `;
+
+    // Add animation keyframes
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes slideDown {
+        from {
+          opacity: 0;
+          transform: translateX(-50%) translateY(-20px);
+        }
+        to {
+          opacity: 1;
+          transform: translateX(-50%) translateY(0);
+        }
+      }
+    `;
+    document.head.appendChild(style);
+
+    document.body.appendChild(toast);
+
+    // Remove after 4 seconds
+    setTimeout(() => {
+      toast.style.animation = 'slideDown 0.3s ease-out reverse';
+      setTimeout(() => {
+        document.body.removeChild(toast);
+        document.head.removeChild(style);
+      }, 300);
+    }, 4000);
   };
 
   const handleContinue = async () => {
@@ -380,13 +465,22 @@ export default function KYCEligibilityScreen({ navigation }: KYCEligibilityScree
                 <View style={styles.inputContainer}>
                   <Text style={styles.inputLabel}>Phone Number *</Text>
                   <TextInput
-                    style={styles.input}
+                    style={[styles.input, fieldErrors.phoneNumber && styles.inputError]}
                     value={phoneNumber}
-                    onChangeText={setPhoneNumber}
+                    onChangeText={(text) => {
+                      setPhoneNumber(text);
+                      if (fieldErrors.phoneNumber) {
+                        const { phoneNumber, ...rest } = fieldErrors;
+                        setFieldErrors(rest);
+                      }
+                    }}
                     placeholder="+971 50 123 4567"
                     keyboardType="phone-pad"
                     autoComplete="tel"
                   />
+                  {fieldErrors.phoneNumber && (
+                    <Text style={styles.inputErrorText}>{fieldErrors.phoneNumber}</Text>
+                  )}
                 </View>
               </View>
 
@@ -415,33 +509,60 @@ export default function KYCEligibilityScreen({ navigation }: KYCEligibilityScree
                     <View style={styles.inputContainer}>
                       <Text style={styles.inputLabel}>Passport Number *</Text>
                       <TextInput
-                        style={styles.input}
+                        style={[styles.input, fieldErrors.passportNumber && styles.inputError]}
                         value={passportNumber}
-                        onChangeText={setPassportNumber}
+                        onChangeText={(text) => {
+                          setPassportNumber(text);
+                          if (fieldErrors.passportNumber) {
+                            const { passportNumber, ...rest } = fieldErrors;
+                            setFieldErrors(rest);
+                          }
+                        }}
                         placeholder="A12345678"
                         autoCapitalize="characters"
                       />
+                      {fieldErrors.passportNumber && (
+                        <Text style={styles.inputErrorText}>{fieldErrors.passportNumber}</Text>
+                      )}
                     </View>
                     <View style={styles.inputContainer}>
                       <Text style={styles.inputLabel}>Passport Issuing Country *</Text>
                       <TextInput
-                        style={styles.input}
+                        style={[styles.input, fieldErrors.passportCountry && styles.inputError]}
                         value={passportCountry}
-                        onChangeText={setPassportCountry}
+                        onChangeText={(text) => {
+                          setPassportCountry(text);
+                          if (fieldErrors.passportCountry) {
+                            const { passportCountry, ...rest } = fieldErrors;
+                            setFieldErrors(rest);
+                          }
+                        }}
                         placeholder="United States"
                       />
+                      {fieldErrors.passportCountry && (
+                        <Text style={styles.inputErrorText}>{fieldErrors.passportCountry}</Text>
+                      )}
                     </View>
                   </>
                 ) : (
                   <View style={styles.inputContainer}>
                     <Text style={styles.inputLabel}>Emirates ID Number *</Text>
                     <TextInput
-                      style={styles.input}
+                      style={[styles.input, fieldErrors.emiratesId && styles.inputError]}
                       value={emiratesId}
-                      onChangeText={setEmiratesId}
+                      onChangeText={(text) => {
+                        setEmiratesId(text);
+                        if (fieldErrors.emiratesId) {
+                          const { emiratesId, ...rest } = fieldErrors;
+                          setFieldErrors(rest);
+                        }
+                      }}
                       placeholder="784-1234-1234567-1"
                       keyboardType="number-pad"
                     />
+                    {fieldErrors.emiratesId && (
+                      <Text style={styles.inputErrorText}>{fieldErrors.emiratesId}</Text>
+                    )}
                   </View>
                 )}
               </View>
@@ -452,20 +573,38 @@ export default function KYCEligibilityScreen({ navigation }: KYCEligibilityScree
                 <View style={styles.inputContainer}>
                   <Text style={styles.inputLabel}>License Number *</Text>
                   <TextInput
-                    style={styles.input}
+                    style={[styles.input, fieldErrors.driversId && styles.inputError]}
                     value={driversId}
-                    onChangeText={setDriversId}
+                    onChangeText={(text) => {
+                      setDriversId(text);
+                      if (fieldErrors.driversId) {
+                        const { driversId, ...rest } = fieldErrors;
+                        setFieldErrors(rest);
+                      }
+                    }}
                     placeholder="DL123456"
                   />
+                  {fieldErrors.driversId && (
+                    <Text style={styles.inputErrorText}>{fieldErrors.driversId}</Text>
+                  )}
                 </View>
                 <View style={styles.inputContainer}>
                   <Text style={styles.inputLabel}>License Issuing Country *</Text>
                   <TextInput
-                    style={styles.input}
+                    style={[styles.input, fieldErrors.driversLicenseCountry && styles.inputError]}
                     value={driversLicenseCountry}
-                    onChangeText={setDriversLicenseCountry}
+                    onChangeText={(text) => {
+                      setDriversLicenseCountry(text);
+                      if (fieldErrors.driversLicenseCountry) {
+                        const { driversLicenseCountry, ...rest } = fieldErrors;
+                        setFieldErrors(rest);
+                      }
+                    }}
                     placeholder="United Arab Emirates"
                   />
+                  {fieldErrors.driversLicenseCountry && (
+                    <Text style={styles.inputErrorText}>{fieldErrors.driversLicenseCountry}</Text>
+                  )}
                 </View>
                 <View style={styles.inputContainer}>
                   <Text style={styles.inputLabel}>License Expiry Date (Optional)</Text>
@@ -500,11 +639,20 @@ export default function KYCEligibilityScreen({ navigation }: KYCEligibilityScree
                 <View style={styles.inputContainer}>
                   <Text style={styles.inputLabel}>Nationality *</Text>
                   <TextInput
-                    style={styles.input}
+                    style={[styles.input, fieldErrors.nationality && styles.inputError]}
                     value={nationality}
-                    onChangeText={setNationality}
+                    onChangeText={(text) => {
+                      setNationality(text);
+                      if (fieldErrors.nationality) {
+                        const { nationality, ...rest } = fieldErrors;
+                        setFieldErrors(rest);
+                      }
+                    }}
                     placeholder="United States"
                   />
+                  {fieldErrors.nationality && (
+                    <Text style={styles.inputErrorText}>{fieldErrors.nationality}</Text>
+                  )}
                 </View>
                 <View style={styles.inputContainer}>
                   <Text style={styles.inputLabel}>Date of Birth (Optional)</Text>
@@ -542,12 +690,20 @@ export default function KYCEligibilityScreen({ navigation }: KYCEligibilityScree
                   {Platform.OS === 'web' ? (
                     <select
                       value={bankProvider}
-                      onChange={(e) => setBankProvider(e.target.value)}
+                      onChange={(e) => {
+                        setBankProvider(e.target.value);
+                        if (fieldErrors.bankProvider) {
+                          const { bankProvider, ...rest } = fieldErrors;
+                          setFieldErrors(rest);
+                        }
+                      }}
                       style={{
                         width: '100%',
                         padding: '16px',
                         fontSize: '16px',
-                        border: `1px solid ${colors.ui.inputBorder}`,
+                        border: fieldErrors.bankProvider
+                          ? '2px solid #f44336'
+                          : `1px solid ${colors.ui.inputBorder}`,
                         borderRadius: '8px',
                         backgroundColor: colors.ui.inputBackground,
                       }}
@@ -561,7 +717,7 @@ export default function KYCEligibilityScreen({ navigation }: KYCEligibilityScree
                     </select>
                   ) : (
                     <TouchableOpacity
-                      style={styles.pickerButton}
+                      style={[styles.pickerButton, fieldErrors.bankProvider && styles.inputError]}
                       onPress={() => setShowBankPicker(!showBankPicker)}
                     >
                       <Text style={bankProvider ? styles.pickerButtonText : styles.placeholderText}>
@@ -579,12 +735,19 @@ export default function KYCEligibilityScreen({ navigation }: KYCEligibilityScree
                           onPress={() => {
                             setBankProvider(bank);
                             setShowBankPicker(false);
+                            if (fieldErrors.bankProvider) {
+                              const { bankProvider, ...rest } = fieldErrors;
+                              setFieldErrors(rest);
+                            }
                           }}
                         >
                           <Text style={styles.pickerOptionText}>{bank}</Text>
                         </TouchableOpacity>
                       ))}
                     </View>
+                  )}
+                  {fieldErrors.bankProvider && (
+                    <Text style={styles.inputErrorText}>{fieldErrors.bankProvider}</Text>
                   )}
                 </View>
 
@@ -639,7 +802,7 @@ export default function KYCEligibilityScreen({ navigation }: KYCEligibilityScree
                 <View style={styles.inputContainer}>
                   <Text style={styles.inputLabel}>Card Number *</Text>
                   <TextInput
-                    style={styles.input}
+                    style={[styles.input, fieldErrors.creditCardNumber && styles.inputError]}
                     value={creditCardNumber}
                     onChangeText={(text) => {
                       const expectedLength = getCardLength(creditCardType);
@@ -648,25 +811,42 @@ export default function KYCEligibilityScreen({ navigation }: KYCEligibilityScree
                       if (cleaned.length <= expectedLength) {
                         setCreditCardNumber(cleaned);
                       }
+                      if (fieldErrors.creditCardNumber) {
+                        const { creditCardNumber, ...rest } = fieldErrors;
+                        setFieldErrors(rest);
+                      }
                     }}
                     placeholder={creditCardType === 'AMEX' ? '123456789012345' : '1234567890123456'}
                     keyboardType="number-pad"
                     maxLength={getCardLength(creditCardType)}
                   />
-                  <Text style={styles.inputHint}>
-                    {creditCardType === 'AMEX' ? '15 digits for AMEX' : '16 digits for VISA/Mastercard'}
-                  </Text>
+                  {fieldErrors.creditCardNumber ? (
+                    <Text style={styles.inputErrorText}>{fieldErrors.creditCardNumber}</Text>
+                  ) : (
+                    <Text style={styles.inputHint}>
+                      {creditCardType === 'AMEX' ? '15 digits for AMEX' : '16 digits for VISA/Mastercard'}
+                    </Text>
+                  )}
                 </View>
 
                 <View style={styles.inputContainer}>
                   <Text style={styles.inputLabel}>Cardholder Name *</Text>
                   <TextInput
-                    style={styles.input}
+                    style={[styles.input, fieldErrors.cardHolderName && styles.inputError]}
                     value={cardHolderName}
-                    onChangeText={setCardHolderName}
+                    onChangeText={(text) => {
+                      setCardHolderName(text);
+                      if (fieldErrors.cardHolderName) {
+                        const { cardHolderName, ...rest } = fieldErrors;
+                        setFieldErrors(rest);
+                      }
+                    }}
                     placeholder="JOHN DOE"
                     autoCapitalize="characters"
                   />
+                  {fieldErrors.cardHolderName && (
+                    <Text style={styles.inputErrorText}>{fieldErrors.cardHolderName}</Text>
+                  )}
                 </View>
               </View>
 
@@ -808,10 +988,20 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.neutral.text.primary,
   },
+  inputError: {
+    borderColor: '#f44336',
+    borderWidth: 2,
+  },
   inputHint: {
     fontSize: 12,
     color: colors.neutral.text.hint,
     marginTop: 4,
+  },
+  inputErrorText: {
+    fontSize: 12,
+    color: '#f44336',
+    marginTop: 4,
+    fontWeight: '500',
   },
   switchContainer: {
     flexDirection: 'row',
