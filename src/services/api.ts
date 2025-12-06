@@ -125,12 +125,19 @@ export const customerAPI = {
     nationality: string;
     dateOfBirth?: string;
     isTourist: boolean;
-    creditCardNumber: string;
+  }): Promise<any> => {
+    const response = await api.put('/customers/kyc/update', kycData);
+    return response.data;
+  },
+
+  updateCard: async (cardData: {
+    email: string;
+    creditCardNumber: string; // Only last 4 digits
     creditCardType: string;
     cardHolderName: string;
     bankProvider: string;
   }): Promise<any> => {
-    const response = await api.put('/customers/kyc/update', kycData);
+    const response = await api.put('/customers/card/update', cardData);
     return response.data;
   },
 };

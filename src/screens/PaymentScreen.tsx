@@ -18,16 +18,43 @@ import { useBookingFlow } from '../contexts/BookingFlowContext';
 import { useAuth } from '../contexts/AuthContext';
 import { PaymentData, AccountingEntry, NotificationPreferences } from '../types';
 import ProgressIndicator from '../components/ProgressIndicator';
+import { customerAPI } from '../services/api';
 
 interface PaymentScreenProps {
   navigation: any;
 }
 
+// UAE Banks and Service Providers
+const UAE_BANKS = [
+  'Emirates NBD',
+  'First Abu Dhabi Bank (FAB)',
+  'Dubai Islamic Bank',
+  'Abu Dhabi Commercial Bank (ADCB)',
+  'Mashreq Bank',
+  'Commercial Bank of Dubai',
+  'RAKBANK',
+  'Abu Dhabi Islamic Bank',
+  'Sharjah Islamic Bank',
+  'Al Hilal Bank',
+  'United Arab Bank',
+  'National Bank of Fujairah',
+  'National Bank of Umm Al Qaiwain',
+  'National Bank of Ras Al Khaimah',
+  'Invest Bank',
+  'Finance House',
+  'Noor Bank',
+  'Other',
+];
+
+// Card Types
+const CARD_TYPES = ['VISA', 'Mastercard', 'AMEX'] as const;
+type CardType = typeof CARD_TYPES[number];
+
 export default function PaymentScreen({ navigation }: PaymentScreenProps) {
   const { flowState, setPaymentData, nextStep, previousStep } = useBookingFlow();
   const { user } = useAuth();
 
-  const [paymentMethod, setPaymentMethod] = useState<'CREDIT_CARD' | 'DEBIT_CARD' | 'BANK_TRANSFER' | 'CASH'>('CREDIT_CARD');
+  const [paymentMethod, setPaymentMethod] = useState<'CREDIT_CARD' | 'DEBIT_CARD' | 'GOOGLE_PAY' | 'APPLE_PAY'>('CREDIT_CARD');
   const [isProcessing, setIsProcessing] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
 
@@ -38,14 +65,68 @@ export default function PaymentScreen({ navigation }: PaymentScreenProps) {
     whatsapp: false,
   });
 
-  // Card details for final confirmation (last 4 digits from KYC)
-  const cardLast4 = flowState.kycData?.creditCardNumber || '****';
-  const cardType = flowState.kycData?.creditCardType || 'CARD';
-  const cardHolderName = flowState.kycData?.cardHolderName || 'Cardholder';
-  const bankProvider = flowState.kycData?.bankProvider || 'Bank';
+  // Card input fields (collected in this step, not from KYC)
+  const [bankProvider, setBankProvider] = useState('');
+  const [creditCardType, setCreditCardType] = useState<CardType>('VISA');
+  const [creditCardNumber, setCreditCardNumber] = useState('');
+  const [cardHolderName, setCardHolderName] = useState('');
+  const [showBankPicker, setShowBankPicker] = useState(false);
+  const [showCardTypePicker, setShowCardTypePicker] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   // Calculate total amount
   const totalAmount = flowState.priceBreakdown?.totalWithVat || 0;
+
+  // Get expected card length based on card type
+  const getCardLength = (cardType: CardType): number => {
+    switch (cardType) {
+      case 'AMEX':
+        return 15;
+      case 'VISA':
+      case 'Mastercard':
+      default:
+        return 16;
+    }
+  };
+
+  // Validate card fields
+  const validateCardFields = (): boolean => {
+    const errors: Record<string, string> = {};
+    const errorMessages: string[] = [];
+
+    // Only validate if payment method requires card
+    if (paymentMethod === 'CREDIT_CARD' || paymentMethod === 'DEBIT_CARD') {
+      if (!bankProvider) {
+        errors.bankProvider = 'Bank/Service Provider required';
+        errorMessages.push('Bank provider');
+      }
+
+      const expectedLength = getCardLength(creditCardType);
+      if (!creditCardNumber || creditCardNumber.length !== expectedLength) {
+        errors.creditCardNumber = `Card number must be exactly ${expectedLength} digits`;
+        errorMessages.push(`Card number (${expectedLength} digits)`);
+      }
+
+      if (!cardHolderName || cardHolderName.trim().length < 3) {
+        errors.cardHolderName = 'Cardholder name required';
+        errorMessages.push('Cardholder name');
+      }
+    }
+
+    setFieldErrors(errors);
+
+    if (errorMessages.length > 0) {
+      const message = `Please complete: ${errorMessages.join(', ')}`;
+      if (Platform.OS === 'web') {
+        alert(message);
+      } else {
+        Alert.alert('Incomplete Information', message);
+      }
+      return false;
+    }
+
+    return true;
+  };
 
   // Generate receipt number
   const generateReceiptNumber = (): string => {
@@ -71,9 +152,29 @@ export default function PaymentScreen({ navigation }: PaymentScreenProps) {
       return;
     }
 
+    // Validate card fields if payment method requires it
+    if (!validateCardFields()) {
+      return;
+    }
+
     setIsProcessing(true);
 
     try {
+      // Save card data to backend via customerAPI (only last 4 digits)
+      const cardLast4 = creditCardNumber.slice(-4);
+
+      if (paymentMethod === 'CREDIT_CARD' || paymentMethod === 'DEBIT_CARD') {
+        console.log('📝 Saving card data to backend...');
+        await customerAPI.updateCard({
+          email: user?.email || '',
+          creditCardNumber: cardLast4,
+          creditCardType,
+          cardHolderName,
+          bankProvider
+        });
+        console.log('✅ Card information saved successfully');
+      }
+
       // Simulate payment gateway processing
       await new Promise(resolve => setTimeout(resolve, 2000));
 
@@ -86,9 +187,9 @@ export default function PaymentScreen({ navigation }: PaymentScreenProps) {
         paymentMethod,
         amount: totalAmount,
         currency: 'AED',
-        cardLast4,
-        cardType,
-        cardHolderName,
+        cardLast4: (paymentMethod === 'CREDIT_CARD' || paymentMethod === 'DEBIT_CARD') ? cardLast4 : undefined,
+        cardType: (paymentMethod === 'CREDIT_CARD' || paymentMethod === 'DEBIT_CARD') ? creditCardType : undefined,
+        cardHolderName: (paymentMethod === 'CREDIT_CARD' || paymentMethod === 'DEBIT_CARD') ? cardHolderName : undefined,
         transactionId: `TXN-${Date.now()}`, // In production, this comes from payment gateway
         transactionDate,
         transactionStatus: 'COMPLETED',
@@ -294,66 +395,229 @@ export default function PaymentScreen({ navigation }: PaymentScreenProps) {
               <TouchableOpacity
                 style={[
                   styles.paymentMethod,
-                  paymentMethod === 'BANK_TRANSFER' && styles.paymentMethodActive
+                  paymentMethod === 'GOOGLE_PAY' && styles.paymentMethodActive
                 ]}
-                onPress={() => setPaymentMethod('BANK_TRANSFER')}
+                onPress={() => setPaymentMethod('GOOGLE_PAY')}
               >
                 <Ionicons
-                  name="business"
+                  name="logo-google"
                   size={24}
-                  color={paymentMethod === 'BANK_TRANSFER' ? colors.primary.main : colors.neutral.text.secondary}
+                  color={paymentMethod === 'GOOGLE_PAY' ? colors.primary.main : colors.neutral.text.secondary}
                 />
                 <Text
                   style={[
                     styles.paymentMethodText,
-                    paymentMethod === 'BANK_TRANSFER' && styles.paymentMethodTextActive
+                    paymentMethod === 'GOOGLE_PAY' && styles.paymentMethodTextActive
                   ]}
                 >
-                  Bank Transfer
+                  Google Pay
                 </Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={[
                   styles.paymentMethod,
-                  paymentMethod === 'CASH' && styles.paymentMethodActive
+                  paymentMethod === 'APPLE_PAY' && styles.paymentMethodActive
                 ]}
-                onPress={() => setPaymentMethod('CASH')}
+                onPress={() => setPaymentMethod('APPLE_PAY')}
               >
                 <Ionicons
-                  name="cash"
+                  name="logo-apple"
                   size={24}
-                  color={paymentMethod === 'CASH' ? colors.primary.main : colors.neutral.text.secondary}
+                  color={paymentMethod === 'APPLE_PAY' ? colors.primary.main : colors.neutral.text.secondary}
                 />
                 <Text
                   style={[
                     styles.paymentMethodText,
-                    paymentMethod === 'CASH' && styles.paymentMethodTextActive
+                    paymentMethod === 'APPLE_PAY' && styles.paymentMethodTextActive
                   ]}
                 >
-                  Cash
+                  Apple Pay
                 </Text>
               </TouchableOpacity>
             </View>
           </View>
 
-          {/* Payment Details from KYC */}
+          {/* Card Input Fields */}
           {(paymentMethod === 'CREDIT_CARD' || paymentMethod === 'DEBIT_CARD') && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Card Details</Text>
-              <View style={styles.cardDetailsCard}>
-                <View style={styles.cardRow}>
-                  <Ionicons name="card" size={40} color={colors.primary.main} />
-                  <View style={styles.cardInfo}>
-                    <Text style={styles.cardType}>{cardType}</Text>
-                    <Text style={styles.cardNumber}>•••• •••• •••• {cardLast4}</Text>
-                    <Text style={styles.cardHolder}>{cardHolderName}</Text>
-                    <Text style={styles.cardBank}>{bankProvider}</Text>
+              <Text style={styles.sectionTitle}>Card Information</Text>
+
+              {/* Bank/Service Provider */}
+              <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>Bank/Service Provider *</Text>
+                {Platform.OS === 'web' ? (
+                  <select
+                    value={bankProvider}
+                    onChange={(e) => {
+                      setBankProvider(e.target.value);
+                      if (fieldErrors.bankProvider) {
+                        const { bankProvider, ...rest } = fieldErrors;
+                        setFieldErrors(rest);
+                      }
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '16px',
+                      fontSize: '16px',
+                      border: fieldErrors.bankProvider
+                        ? '2px solid #f44336'
+                        : `1px solid ${colors.ui.inputBorder}`,
+                      borderRadius: '8px',
+                      backgroundColor: colors.ui.inputBackground,
+                    }}
+                  >
+                    <option value="">Select Bank...</option>
+                    {UAE_BANKS.map((bank) => (
+                      <option key={bank} value={bank}>
+                        {bank}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <TouchableOpacity
+                    style={[styles.pickerButton, fieldErrors.bankProvider && styles.inputError]}
+                    onPress={() => setShowBankPicker(!showBankPicker)}
+                  >
+                    <Text style={bankProvider ? styles.pickerButtonText : styles.placeholderText}>
+                      {bankProvider || 'Select Bank...'}
+                    </Text>
+                    <Ionicons name="chevron-down" size={20} color={colors.neutral.text.secondary} />
+                  </TouchableOpacity>
+                )}
+                {showBankPicker && Platform.OS !== 'web' && (
+                  <View style={styles.pickerOptions}>
+                    {UAE_BANKS.map((bank) => (
+                      <TouchableOpacity
+                        key={bank}
+                        style={styles.pickerOption}
+                        onPress={() => {
+                          setBankProvider(bank);
+                          setShowBankPicker(false);
+                          if (fieldErrors.bankProvider) {
+                            const { bankProvider, ...rest } = fieldErrors;
+                            setFieldErrors(rest);
+                          }
+                        }}
+                      >
+                        <Text style={styles.pickerOptionText}>{bank}</Text>
+                      </TouchableOpacity>
+                    ))}
                   </View>
-                </View>
-                <View style={styles.verifiedBadge}>
-                  <Ionicons name="shield-checkmark" size={16} color={colors.financial.positive} />
-                  <Text style={styles.verifiedText}>Verified</Text>
+                )}
+                {fieldErrors.bankProvider && (
+                  <Text style={styles.inputErrorText}>{fieldErrors.bankProvider}</Text>
+                )}
+              </View>
+
+              {/* Card Type */}
+              <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>Card Type *</Text>
+                {Platform.OS === 'web' ? (
+                  <select
+                    value={creditCardType}
+                    onChange={(e) => setCreditCardType(e.target.value as CardType)}
+                    style={{
+                      width: '100%',
+                      padding: '16px',
+                      fontSize: '16px',
+                      border: `1px solid ${colors.ui.inputBorder}`,
+                      borderRadius: '8px',
+                      backgroundColor: colors.ui.inputBackground,
+                    }}
+                  >
+                    {CARD_TYPES.map((type) => (
+                      <option key={type} value={type}>
+                        {type}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <TouchableOpacity
+                    style={styles.pickerButton}
+                    onPress={() => setShowCardTypePicker(!showCardTypePicker)}
+                  >
+                    <Text style={styles.pickerButtonText}>{creditCardType}</Text>
+                    <Ionicons name="chevron-down" size={20} color={colors.neutral.text.secondary} />
+                  </TouchableOpacity>
+                )}
+                {showCardTypePicker && Platform.OS !== 'web' && (
+                  <View style={styles.pickerOptions}>
+                    {CARD_TYPES.map((type) => (
+                      <TouchableOpacity
+                        key={type}
+                        style={styles.pickerOption}
+                        onPress={() => {
+                          setCreditCardType(type as CardType);
+                          setShowCardTypePicker(false);
+                        }}
+                      >
+                        <Text style={styles.pickerOptionText}>{type}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </View>
+
+              {/* Card Number */}
+              <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>Card Number *</Text>
+                <TextInput
+                  style={[styles.input, fieldErrors.creditCardNumber && styles.inputError]}
+                  value={creditCardNumber}
+                  onChangeText={(text) => {
+                    const expectedLength = getCardLength(creditCardType);
+                    const cleaned = text.replace(/\D/g, '');
+                    if (cleaned.length <= expectedLength) {
+                      setCreditCardNumber(cleaned);
+                    }
+                    if (fieldErrors.creditCardNumber) {
+                      const { creditCardNumber, ...rest } = fieldErrors;
+                      setFieldErrors(rest);
+                    }
+                  }}
+                  placeholder={creditCardType === 'AMEX' ? '123456789012345' : '1234567890123456'}
+                  keyboardType="number-pad"
+                  maxLength={getCardLength(creditCardType)}
+                />
+                {fieldErrors.creditCardNumber ? (
+                  <Text style={styles.inputErrorText}>{fieldErrors.creditCardNumber}</Text>
+                ) : (
+                  <Text style={styles.inputHint}>
+                    {creditCardType === 'AMEX' ? '15 digits for AMEX' : '16 digits for VISA/Mastercard'}
+                  </Text>
+                )}
+              </View>
+
+              {/* Cardholder Name */}
+              <View style={styles.inputContainer}>
+                <Text style={styles.inputLabel}>Cardholder Name *</Text>
+                <TextInput
+                  style={[styles.input, fieldErrors.cardHolderName && styles.inputError]}
+                  value={cardHolderName}
+                  onChangeText={(text) => {
+                    setCardHolderName(text);
+                    if (fieldErrors.cardHolderName) {
+                      const { cardHolderName, ...rest } = fieldErrors;
+                      setFieldErrors(rest);
+                    }
+                  }}
+                  placeholder="JOHN DOE"
+                  autoCapitalize="characters"
+                />
+                {fieldErrors.cardHolderName && (
+                  <Text style={styles.inputErrorText}>{fieldErrors.cardHolderName}</Text>
+                )}
+              </View>
+
+              {/* Security Notice for Card */}
+              <View style={styles.infoBox}>
+                <Ionicons name="shield-checkmark" size={24} color={colors.financial.info} />
+                <View style={styles.infoContent}>
+                  <Text style={styles.infoTitle}>Card Information Security</Text>
+                  <Text style={styles.infoText}>
+                    Only the last 4 digits of your card will be stored. Full card details are encrypted and processed securely through PCI-compliant payment gateways.
+                  </Text>
                 </View>
               </View>
             </View>
@@ -812,5 +1076,99 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: colors.neutral.text.primary,
     fontWeight: '500',
+  },
+  // Card Input Field Styles
+  inputContainer: {
+    marginBottom: 16,
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: colors.neutral.text.primary,
+    marginBottom: 8,
+  },
+  input: {
+    backgroundColor: colors.ui.inputBackground,
+    borderWidth: 1,
+    borderColor: colors.ui.inputBorder,
+    borderRadius: 8,
+    padding: 16,
+    fontSize: 16,
+    color: colors.neutral.text.primary,
+  },
+  inputError: {
+    borderColor: '#f44336',
+    borderWidth: 2,
+  },
+  inputHint: {
+    fontSize: 12,
+    color: colors.neutral.text.hint,
+    marginTop: 4,
+  },
+  inputErrorText: {
+    fontSize: 12,
+    color: '#f44336',
+    marginTop: 4,
+    fontWeight: '500',
+  },
+  pickerButton: {
+    backgroundColor: colors.ui.inputBackground,
+    borderWidth: 1,
+    borderColor: colors.ui.inputBorder,
+    borderRadius: 8,
+    padding: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  pickerButtonText: {
+    fontSize: 16,
+    color: colors.neutral.text.primary,
+  },
+  placeholderText: {
+    fontSize: 16,
+    color: colors.neutral.text.hint,
+  },
+  pickerOptions: {
+    backgroundColor: colors.ui.cardBackground,
+    borderWidth: 1,
+    borderColor: colors.neutral.border,
+    borderRadius: 8,
+    marginTop: 4,
+    maxHeight: 200,
+    ...colors.shadows.medium,
+  },
+  pickerOption: {
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.neutral.border,
+  },
+  pickerOptionText: {
+    fontSize: 16,
+    color: colors.neutral.text.primary,
+  },
+  infoBox: {
+    flexDirection: 'row',
+    backgroundColor: colors.financial.info + '10',
+    borderRadius: 8,
+    padding: 16,
+    marginTop: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: colors.financial.info,
+  },
+  infoContent: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  infoTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.neutral.text.primary,
+    marginBottom: 4,
+  },
+  infoText: {
+    fontSize: 13,
+    color: colors.neutral.text.secondary,
+    lineHeight: 18,
   },
 });

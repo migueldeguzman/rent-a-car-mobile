@@ -93,7 +93,7 @@ export interface Booking {
   totalAmount: string;
   status: 'PENDING' | 'CONFIRMED' | 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
   notes: string | null;
-  paymentMethod?: 'CASH' | 'CREDIT_CARD' | 'BANK_TRANSFER';
+  paymentMethod?: 'CREDIT_CARD' | 'DEBIT_CARD' | 'GOOGLE_PAY' | 'APPLE_PAY';
   termsAccepted?: boolean;
   addOns?: AddOn[];
   notificationPreferences?: NotificationPreferences;
@@ -177,7 +177,7 @@ export interface KYCData {
  */
 export interface PaymentData {
   // Payment details
-  paymentMethod: 'CREDIT_CARD' | 'DEBIT_CARD' | 'BANK_TRANSFER' | 'CASH';
+  paymentMethod: 'CREDIT_CARD' | 'DEBIT_CARD' | 'GOOGLE_PAY' | 'APPLE_PAY';
   amount: number; // Total amount charged
   currency: string; // Default "AED"
 

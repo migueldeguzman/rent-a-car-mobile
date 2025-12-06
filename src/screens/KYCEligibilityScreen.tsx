@@ -24,20 +24,7 @@ interface KYCEligibilityScreenProps {
   navigation: any;
 }
 
-const UAE_BANKS = [
-  'Emirates NBD',
-  'First Abu Dhabi Bank (FAB)',
-  'Abu Dhabi Commercial Bank (ADCB)',
-  'Dubai Islamic Bank',
-  'Mashreq Bank',
-  'RAKBANK',
-  'Commercial Bank of Dubai',
-  'Union National Bank',
-  'Sharjah Islamic Bank',
-  'Other',
-];
-
-const CARD_TYPES = ['VISA', 'MASTERCARD', 'AMEX', 'OTHER'];
+// UAE_BANKS and CARD_TYPES moved to PaymentScreen
 
 export default function KYCEligibilityScreen({ navigation }: KYCEligibilityScreenProps) {
   const { flowState, setKYCData, nextStep, previousStep } = useBookingFlow();
@@ -59,26 +46,7 @@ export default function KYCEligibilityScreen({ navigation }: KYCEligibilityScree
   const [nationality, setNationality] = useState('');
   const [dateOfBirth, setDateOfBirth] = useState('');
 
-  // Payment information
-  const [creditCardNumber, setCreditCardNumber] = useState(''); // Full card number
-  const [creditCardType, setCreditCardType] = useState<'VISA' | 'MASTERCARD' | 'AMEX' | 'OTHER'>('VISA');
-
-  // Get expected card length based on type
-  const getCardLength = (type: string): number => {
-    switch (type) {
-      case 'AMEX':
-        return 15;
-      case 'VISA':
-      case 'MASTERCARD':
-        return 16;
-      default:
-        return 16; // Default to 16
-    }
-  };
-  const [cardHolderName, setCardHolderName] = useState('');
-  const [bankProvider, setBankProvider] = useState('');
-  const [showBankPicker, setShowBankPicker] = useState(false);
-  const [showCardTypePicker, setShowCardTypePicker] = useState(false);
+  // Payment information fields removed - now handled in PaymentScreen
 
   // Field validation errors
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -144,27 +112,7 @@ export default function KYCEligibilityScreen({ navigation }: KYCEligibilityScree
       errorMessages.push('Nationality');
     }
 
-    // Credit Card
-    const expectedLength = getCardLength(creditCardType);
-    if (!creditCardNumber) {
-      errors.creditCardNumber = 'Card number required';
-      errorMessages.push('Card number');
-    } else if (creditCardNumber.length !== expectedLength) {
-      errors.creditCardNumber = `${creditCardType} requires ${expectedLength} digits`;
-      errorMessages.push('Card number (incomplete)');
-    }
-
-    // Cardholder Name
-    if (!cardHolderName) {
-      errors.cardHolderName = 'Cardholder name required';
-      errorMessages.push('Cardholder name');
-    }
-
-    // Bank Provider
-    if (!bankProvider) {
-      errors.bankProvider = 'Bank/service provider required';
-      errorMessages.push('Bank provider');
-    }
+    // Card fields removed - now validated in PaymentScreen
 
     setFieldErrors(errors);
 
@@ -239,8 +187,7 @@ export default function KYCEligibilityScreen({ navigation }: KYCEligibilityScree
     setIsProcessing(true);
 
     try {
-      // Extract last 4 digits for storage (PCI compliance)
-      const last4Digits = creditCardNumber.slice(-4);
+      // Card data removed - will be collected in PaymentScreen
 
       const kycData: KYCData = {
         verificationType,
@@ -251,10 +198,6 @@ export default function KYCEligibilityScreen({ navigation }: KYCEligibilityScree
         driversId,
         driversLicenseCountry,
         driversLicenseExpiry: driversLicenseExpiry || undefined,
-        creditCardNumber: last4Digits, // Store only last 4 digits
-        creditCardType,
-        cardHolderName,
-        bankProvider,
         isTourist,
         nationality,
         dateOfBirth: dateOfBirth || undefined,
@@ -264,7 +207,7 @@ export default function KYCEligibilityScreen({ navigation }: KYCEligibilityScree
 
       console.log('📝 Saving KYC data to backend...');
 
-      // Save KYC data to backend (only last 4 digits of card)
+      // Save KYC data to backend (without card information)
       await customerAPI.updateKYC({
         email: user?.email || '', // Get email from authenticated user
         phoneNumber, // Add phone number from form
@@ -277,10 +220,6 @@ export default function KYCEligibilityScreen({ navigation }: KYCEligibilityScree
         nationality,
         dateOfBirth: dateOfBirth || undefined,
         isTourist,
-        creditCardNumber: last4Digits, // Only send last 4 digits to backend
-        creditCardType,
-        cardHolderName,
-        bankProvider,
       });
 
       console.log('✅ KYC data saved successfully');
@@ -691,186 +630,6 @@ export default function KYCEligibilityScreen({ navigation }: KYCEligibilityScree
                       placeholder="YYYY-MM-DD"
                     />
                   )}
-                </View>
-              </View>
-
-              {/* Payment Information */}
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Payment Information</Text>
-
-                <View style={styles.inputContainer}>
-                  <Text style={styles.inputLabel}>Bank/Service Provider *</Text>
-                  {Platform.OS === 'web' ? (
-                    <select
-                      value={bankProvider}
-                      onChange={(e) => {
-                        setBankProvider(e.target.value);
-                        if (fieldErrors.bankProvider) {
-                          const { bankProvider, ...rest } = fieldErrors;
-                          setFieldErrors(rest);
-                        }
-                      }}
-                      style={{
-                        width: '100%',
-                        padding: '16px',
-                        fontSize: '16px',
-                        border: fieldErrors.bankProvider
-                          ? '2px solid #f44336'
-                          : `1px solid ${colors.ui.inputBorder}`,
-                        borderRadius: '8px',
-                        backgroundColor: colors.ui.inputBackground,
-                      }}
-                    >
-                      <option value="">Select Bank...</option>
-                      {UAE_BANKS.map((bank) => (
-                        <option key={bank} value={bank}>
-                          {bank}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <TouchableOpacity
-                      style={[styles.pickerButton, fieldErrors.bankProvider && styles.inputError]}
-                      onPress={() => setShowBankPicker(!showBankPicker)}
-                    >
-                      <Text style={bankProvider ? styles.pickerButtonText : styles.placeholderText}>
-                        {bankProvider || 'Select Bank...'}
-                      </Text>
-                      <Ionicons name="chevron-down" size={20} color={colors.neutral.text.secondary} />
-                    </TouchableOpacity>
-                  )}
-                  {showBankPicker && Platform.OS !== 'web' && (
-                    <View style={styles.pickerOptions}>
-                      {UAE_BANKS.map((bank) => (
-                        <TouchableOpacity
-                          key={bank}
-                          style={styles.pickerOption}
-                          onPress={() => {
-                            setBankProvider(bank);
-                            setShowBankPicker(false);
-                            if (fieldErrors.bankProvider) {
-                              const { bankProvider, ...rest } = fieldErrors;
-                              setFieldErrors(rest);
-                            }
-                          }}
-                        >
-                          <Text style={styles.pickerOptionText}>{bank}</Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  )}
-                  {fieldErrors.bankProvider && (
-                    <Text style={styles.inputErrorText}>{fieldErrors.bankProvider}</Text>
-                  )}
-                </View>
-
-                <View style={styles.inputContainer}>
-                  <Text style={styles.inputLabel}>Card Type *</Text>
-                  {Platform.OS === 'web' ? (
-                    <select
-                      value={creditCardType}
-                      onChange={(e) => setCreditCardType(e.target.value as any)}
-                      style={{
-                        width: '100%',
-                        padding: '16px',
-                        fontSize: '16px',
-                        border: `1px solid ${colors.ui.inputBorder}`,
-                        borderRadius: '8px',
-                        backgroundColor: colors.ui.inputBackground,
-                      }}
-                    >
-                      {CARD_TYPES.map((type) => (
-                        <option key={type} value={type}>
-                          {type}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <TouchableOpacity
-                      style={styles.pickerButton}
-                      onPress={() => setShowCardTypePicker(!showCardTypePicker)}
-                    >
-                      <Text style={styles.pickerButtonText}>{creditCardType}</Text>
-                      <Ionicons name="chevron-down" size={20} color={colors.neutral.text.secondary} />
-                    </TouchableOpacity>
-                  )}
-                  {showCardTypePicker && Platform.OS !== 'web' && (
-                    <View style={styles.pickerOptions}>
-                      {CARD_TYPES.map((type) => (
-                        <TouchableOpacity
-                          key={type}
-                          style={styles.pickerOption}
-                          onPress={() => {
-                            setCreditCardType(type as any);
-                            setShowCardTypePicker(false);
-                          }}
-                        >
-                          <Text style={styles.pickerOptionText}>{type}</Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  )}
-                </View>
-
-                <View style={styles.inputContainer}>
-                  <Text style={styles.inputLabel}>Card Number *</Text>
-                  <TextInput
-                    style={[styles.input, fieldErrors.creditCardNumber && styles.inputError]}
-                    value={creditCardNumber}
-                    onChangeText={(text) => {
-                      const expectedLength = getCardLength(creditCardType);
-                      // Only allow digits up to expected length
-                      const cleaned = text.replace(/\D/g, '');
-                      if (cleaned.length <= expectedLength) {
-                        setCreditCardNumber(cleaned);
-                      }
-                      if (fieldErrors.creditCardNumber) {
-                        const { creditCardNumber, ...rest } = fieldErrors;
-                        setFieldErrors(rest);
-                      }
-                    }}
-                    placeholder={creditCardType === 'AMEX' ? '123456789012345' : '1234567890123456'}
-                    keyboardType="number-pad"
-                    maxLength={getCardLength(creditCardType)}
-                  />
-                  {fieldErrors.creditCardNumber ? (
-                    <Text style={styles.inputErrorText}>{fieldErrors.creditCardNumber}</Text>
-                  ) : (
-                    <Text style={styles.inputHint}>
-                      {creditCardType === 'AMEX' ? '15 digits for AMEX' : '16 digits for VISA/Mastercard'}
-                    </Text>
-                  )}
-                </View>
-
-                <View style={styles.inputContainer}>
-                  <Text style={styles.inputLabel}>Cardholder Name *</Text>
-                  <TextInput
-                    style={[styles.input, fieldErrors.cardHolderName && styles.inputError]}
-                    value={cardHolderName}
-                    onChangeText={(text) => {
-                      setCardHolderName(text);
-                      if (fieldErrors.cardHolderName) {
-                        const { cardHolderName, ...rest } = fieldErrors;
-                        setFieldErrors(rest);
-                      }
-                    }}
-                    placeholder="JOHN DOE"
-                    autoCapitalize="characters"
-                  />
-                  {fieldErrors.cardHolderName && (
-                    <Text style={styles.inputErrorText}>{fieldErrors.cardHolderName}</Text>
-                  )}
-                </View>
-              </View>
-
-              {/* Info Box */}
-              <View style={styles.infoBox}>
-                <Ionicons name="shield-checkmark" size={24} color={colors.financial.info} />
-                <View style={styles.infoContent}>
-                  <Text style={styles.infoTitle}>Your Information is Secure</Text>
-                  <Text style={styles.infoText}>
-                    All personal and payment information is encrypted and securely stored. We comply with UAE data protection regulations.
-                  </Text>
                 </View>
               </View>
             </>
