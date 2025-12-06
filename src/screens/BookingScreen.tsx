@@ -74,19 +74,41 @@ export default function BookingScreen({ navigation, route }: BookingScreenProps)
   // Handle period selection changes
   const handlePeriodChange = (period: RentalPeriodOption) => {
     setSelectedPeriod(period);
-    const today = new Date();
 
+    // Update end date based on selected period and current start date
+    // 1 month = 30 days, 3 months = 90 days, 6 months = 180 days (fixed)
     if (period === '1_MONTH') {
-      setEndDate(new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000));
+      setEndDate(new Date(startDate.getTime() + 30 * 24 * 60 * 60 * 1000));
     } else if (period === '3_MONTHS') {
-      setEndDate(new Date(today.getTime() + 90 * 24 * 60 * 60 * 1000));
+      setEndDate(new Date(startDate.getTime() + 90 * 24 * 60 * 60 * 1000));
     } else if (period === '6_MONTHS') {
-      setEndDate(new Date(today.getTime() + 180 * 24 * 60 * 60 * 1000));
+      setEndDate(new Date(startDate.getTime() + 180 * 24 * 60 * 60 * 1000));
     }
     // For CUSTOM, don't change the end date - let user pick
   };
 
+  // Update end date when start date changes (for preset periods)
+  const handleStartDateChangeWithPeriod = (event: any, selectedDate?: Date) => {
+    setShowStartPicker(Platform.OS === 'ios');
+    if (selectedDate) {
+      setStartDate(selectedDate);
+
+      // Recalculate end date based on selected period
+      if (selectedPeriod === '1_MONTH') {
+        setEndDate(new Date(selectedDate.getTime() + 30 * 24 * 60 * 60 * 1000));
+      } else if (selectedPeriod === '3_MONTHS') {
+        setEndDate(new Date(selectedDate.getTime() + 90 * 24 * 60 * 60 * 1000));
+      } else if (selectedPeriod === '6_MONTHS') {
+        setEndDate(new Date(selectedDate.getTime() + 180 * 24 * 60 * 60 * 1000));
+      } else if (selectedDate >= endDate) {
+        // For CUSTOM period, ensure end date is after start date
+        setEndDate(new Date(selectedDate.getTime() + 24 * 60 * 60 * 1000));
+      }
+    }
+  };
+
   // Calculate rates based on selected period
+  // Note: 1 month = exactly 30 days, 3 months = exactly 90 days, 6 months = exactly 180 days
   const calculatePanelBasedRate = (): {
     totalAmount: number;
     breakdown: string;
@@ -105,6 +127,7 @@ export default function BookingScreen({ navigation, route }: BookingScreenProps)
     const daily = typeof vehicle.dailyRate === 'string' ? parseFloat(vehicle.dailyRate) : vehicle.dailyRate;
     const baseMonthlyRate = typeof vehicle.monthlyRate === 'string' ? parseFloat(vehicle.monthlyRate) : vehicle.monthlyRate;
 
+    // 1 month = 30 days (fixed)
     const months = Math.floor(totalDays / 30);
     const remainingDays = totalDays % 30;
 
@@ -168,16 +191,6 @@ export default function BookingScreen({ navigation, route }: BookingScreenProps)
     ? ((rateCalculation.savings / (rateCalculation.totalDays * parseFloat(String(vehicle.dailyRate)))) * 100).toFixed(0)
     : 0;
 
-  const handleStartDateChange = (event: any, selectedDate?: Date) => {
-    setShowStartPicker(Platform.OS === 'ios');
-    if (selectedDate) {
-      setStartDate(selectedDate);
-      // Ensure end date is after start date
-      if (selectedDate >= endDate) {
-        setEndDate(new Date(selectedDate.getTime() + 24 * 60 * 60 * 1000));
-      }
-    }
-  };
 
   const handleEndDateChange = (event: any, selectedDate?: Date) => {
     setShowEndPicker(Platform.OS === 'ios');
@@ -464,13 +477,10 @@ export default function BookingScreen({ navigation, route }: BookingScreenProps)
           </View>
         </View>
 
-        {/* Date Selection - Only show for Custom period */}
-        {selectedPeriod === 'CUSTOM' && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Custom Date Range</Text>
-
+        {/* Start Date Selection - Show for all periods */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Rental Start Date</Text>
           <View style={styles.dateContainer}>
-            <Text style={styles.dateLabel}>Start Date</Text>
             {Platform.OS === 'web' ? (
               <input
                 type="date"
@@ -478,10 +488,7 @@ export default function BookingScreen({ navigation, route }: BookingScreenProps)
                 min={new Date().toISOString().split('T')[0]}
                 onChange={(e) => {
                   const newDate = new Date(e.target.value);
-                  setStartDate(newDate);
-                  if (newDate >= endDate) {
-                    setEndDate(new Date(newDate.getTime() + 24 * 60 * 60 * 1000));
-                  }
+                  handleStartDateChangeWithPeriod(null, newDate);
                 }}
                 style={{
                   width: '100%',
@@ -513,15 +520,24 @@ export default function BookingScreen({ navigation, route }: BookingScreenProps)
                     mode="date"
                     display="default"
                     minimumDate={new Date()}
-                    onChange={handleStartDateChange}
+                    onChange={handleStartDateChangeWithPeriod}
                   />
                 )}
               </>
             )}
           </View>
+          <Text style={styles.dateHint}>
+            Rental will {selectedPeriod === '1_MONTH' ? 'be 30 days (1 month)' :
+                        selectedPeriod === '3_MONTHS' ? 'be 90 days (3 months)' :
+                        selectedPeriod === '6_MONTHS' ? 'be 180 days (6 months)' : 'end on your selected date'}
+          </Text>
+        </View>
 
+        {/* Custom End Date Selection - Only for Custom period */}
+        {selectedPeriod === 'CUSTOM' && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Custom End Date</Text>
           <View style={styles.dateContainer}>
-            <Text style={styles.dateLabel}>End Date</Text>
             {Platform.OS === 'web' ? (
               <input
                 type="date"
@@ -892,6 +908,12 @@ const styles = StyleSheet.create({
   dateText: {
     fontSize: 16,
     color: colors.neutral.text.primary,
+  },
+  dateHint: {
+    fontSize: 12,
+    color: colors.neutral.text.hint,
+    fontStyle: 'italic',
+    marginTop: 4,
   },
   paymentContainer: {
     flexDirection: 'row',
