@@ -16,7 +16,6 @@ export interface Customer {
   licenseIssuedAt?: string | null;
   licenseIssueDate?: string | null;
   licenseExpiryDate?: string | null;
-  driversId?: string | null; // Driver License ID/Number (for all customers)
   emiratesId?: string | null; // Emirates ID Number (only for UAE residents, NULL for tourists)
   isTourist?: boolean; // TRUE if tourist (passport holder), FALSE if UAE resident
   companyName?: string | null;
@@ -42,7 +41,7 @@ export interface User {
   firstName: string;
   lastName: string;
   role: string;
-  driversId?: string | null;
+  licenseNumber?: string | null;
   emiratesId?: string | null;
   isTourist?: boolean;
   nationality?: string;
@@ -151,7 +150,7 @@ export interface KYCData {
   emiratesId?: string | null; // For UAE residents
   passportNumber?: string | null; // For tourists
   passportCountry?: string | null; // Passport issuing country
-  driversId: string; // Driver's license number (required for all)
+  licenseNumber: string; // Driver's license number (required for all)
   driversLicenseCountry?: string; // License issuing country
   driversLicenseExpiry?: string; // Expiry date
 

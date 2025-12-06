@@ -28,7 +28,7 @@ interface KYCEligibilityScreenProps {
 
 export default function KYCEligibilityScreen({ navigation }: KYCEligibilityScreenProps) {
   const { flowState, setKYCData, nextStep, previousStep } = useBookingFlow();
-  const { user } = useAuth();
+  const { user, register, login } = useAuth();
 
   // Verification method
   const [verificationType, setVerificationType] = useState<'UAE_PASS' | 'MANUAL'>('MANUAL');
@@ -40,11 +40,18 @@ export default function KYCEligibilityScreen({ navigation }: KYCEligibilityScree
   const [emiratesId, setEmiratesId] = useState('');
   const [passportNumber, setPassportNumber] = useState('');
   const [passportCountry, setPassportCountry] = useState('');
-  const [driversId, setDriversId] = useState('');
+  const [licenseNumber, setLicenseNumber] = useState('');
   const [driversLicenseCountry, setDriversLicenseCountry] = useState('');
   const [driversLicenseExpiry, setDriversLicenseExpiry] = useState('');
   const [nationality, setNationality] = useState('');
   const [dateOfBirth, setDateOfBirth] = useState('');
+
+  // Account creation fields (collected after KYC validation)
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
 
   // Payment information fields removed - now handled in PaymentScreen
 
@@ -97,8 +104,8 @@ export default function KYCEligibilityScreen({ navigation }: KYCEligibilityScree
     }
 
     // Driver's License
-    if (!driversId) {
-      errors.driversId = 'Driver license number required';
+    if (!licenseNumber) {
+      errors.licenseNumber = 'Driver license number required';
       errorMessages.push('Driver license number');
     }
     if (!driversLicenseCountry) {
@@ -112,7 +119,31 @@ export default function KYCEligibilityScreen({ navigation }: KYCEligibilityScree
       errorMessages.push('Nationality');
     }
 
-    // Card fields removed - now validated in PaymentScreen
+    // Account Creation Fields
+    if (!firstName || firstName.trim().length < 2) {
+      errors.firstName = 'First name required (min 2 characters)';
+      errorMessages.push('First name');
+    }
+
+    if (!lastName || lastName.trim().length < 2) {
+      errors.lastName = 'Last name required (min 2 characters)';
+      errorMessages.push('Last name');
+    }
+
+    if (!email || !email.includes('@')) {
+      errors.email = 'Valid email address required';
+      errorMessages.push('Email');
+    }
+
+    if (!password || password.length < 8) {
+      errors.password = 'Password required (min 8 characters)';
+      errorMessages.push('Password');
+    }
+
+    if (password !== confirmPassword) {
+      errors.confirmPassword = 'Passwords do not match';
+      errorMessages.push('Password confirmation');
+    }
 
     setFieldErrors(errors);
 
@@ -187,15 +218,43 @@ export default function KYCEligibilityScreen({ navigation }: KYCEligibilityScree
     setIsProcessing(true);
 
     try {
-      // Card data removed - will be collected in PaymentScreen
+      console.log('📝 Creating customer account with KYC data...');
 
+      // Step 1: Register user account with KYC data via new endpoint
+      const registerResponse = await customerAPI.registerWithKYC({
+        // Account credentials
+        email,
+        password,
+        firstName,
+        lastName,
+        // KYC identity data
+        phoneNumber,
+        emiratesId: isTourist ? null : emiratesId,
+        passportNumber: isTourist ? passportNumber : null,
+        passportCountry: isTourist ? passportCountry : null,
+        licenseNumber,
+        driversLicenseCountry,
+        driversLicenseExpiry: driversLicenseExpiry || undefined,
+        nationality,
+        dateOfBirth: dateOfBirth || undefined,
+        isTourist,
+      });
+
+      console.log('✅ Customer account created successfully');
+
+      // Step 2: Auto-login the user with new credentials
+      await login(email, password);
+
+      console.log('✅ User auto-logged in');
+
+      // Step 3: Save KYC data to flow context for reference
       const kycData: KYCData = {
         verificationType,
         phoneNumber,
         emiratesId: isTourist ? null : emiratesId,
         passportNumber: isTourist ? passportNumber : null,
         passportCountry: isTourist ? passportCountry : null,
-        driversId,
+        licenseNumber,
         driversLicenseCountry,
         driversLicenseExpiry: driversLicenseExpiry || undefined,
         isTourist,
@@ -205,33 +264,13 @@ export default function KYCEligibilityScreen({ navigation }: KYCEligibilityScree
         verifiedAt: new Date().toISOString(),
       };
 
-      console.log('📝 Saving KYC data to backend...');
-
-      // Save KYC data to backend (without card information)
-      await customerAPI.updateKYC({
-        email: user?.email || '', // Get email from authenticated user
-        phoneNumber, // Add phone number from form
-        emiratesId: isTourist ? null : emiratesId,
-        passportNumber: isTourist ? passportNumber : null,
-        passportCountry: isTourist ? passportCountry : null,
-        driversId,
-        driversLicenseCountry,
-        driversLicenseExpiry: driversLicenseExpiry || undefined,
-        nationality,
-        dateOfBirth: dateOfBirth || undefined,
-        isTourist,
-      });
-
-      console.log('✅ KYC data saved successfully');
-
-      // Save to flow context
       setKYCData(kycData);
 
       // Navigate to payment
       nextStep(); // Go to Step 3: Payment
       navigation.navigate('Payment');
     } catch (error: any) {
-      console.error('❌ Error saving KYC data:', error);
+      console.error('❌ Error creating customer account:', error);
       console.error('❌ Error details:', {
         message: error.message,
         response: error.response?.data,
@@ -239,7 +278,7 @@ export default function KYCEligibilityScreen({ navigation }: KYCEligibilityScree
         statusText: error.response?.statusText
       });
 
-      const errorMessage = error.response?.data?.message || 'Failed to save KYC information. Please try again.';
+      const errorMessage = error.response?.data?.message || 'Failed to create account. Please try again.';
       const errorDetails = error.response?.data?.error;
 
       // Enhanced error message with details
@@ -525,19 +564,19 @@ export default function KYCEligibilityScreen({ navigation }: KYCEligibilityScree
                 <View style={styles.inputContainer}>
                   <Text style={styles.inputLabel}>License Number *</Text>
                   <TextInput
-                    style={[styles.input, fieldErrors.driversId && styles.inputError]}
-                    value={driversId}
+                    style={[styles.input, fieldErrors.licenseNumber && styles.inputError]}
+                    value={licenseNumber}
                     onChangeText={(text) => {
-                      setDriversId(text);
-                      if (fieldErrors.driversId) {
-                        const { driversId, ...rest } = fieldErrors;
+                      setLicenseNumber(text);
+                      if (fieldErrors.licenseNumber) {
+                        const { licenseNumber, ...rest } = fieldErrors;
                         setFieldErrors(rest);
                       }
                     }}
                     placeholder="DL123456"
                   />
-                  {fieldErrors.driversId && (
-                    <Text style={styles.inputErrorText}>{fieldErrors.driversId}</Text>
+                  {fieldErrors.licenseNumber && (
+                    <Text style={styles.inputErrorText}>{fieldErrors.licenseNumber}</Text>
                   )}
                 </View>
                 <View style={styles.inputContainer}>
@@ -632,6 +671,118 @@ export default function KYCEligibilityScreen({ navigation }: KYCEligibilityScree
                   )}
                 </View>
               </View>
+
+              {/* Account Creation Section */}
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Create Your Account</Text>
+                <Text style={styles.sectionSubtext}>
+                  Set up your account credentials to complete the booking process
+                </Text>
+
+                <View style={styles.inputContainer}>
+                  <Text style={styles.inputLabel}>First Name *</Text>
+                  <TextInput
+                    style={[styles.input, fieldErrors.firstName && styles.inputError]}
+                    value={firstName}
+                    onChangeText={(text) => {
+                      setFirstName(text);
+                      if (fieldErrors.firstName) {
+                        const { firstName, ...rest } = fieldErrors;
+                        setFieldErrors(rest);
+                      }
+                    }}
+                    placeholder="John"
+                    autoComplete="given-name"
+                  />
+                  {fieldErrors.firstName && (
+                    <Text style={styles.inputErrorText}>{fieldErrors.firstName}</Text>
+                  )}
+                </View>
+
+                <View style={styles.inputContainer}>
+                  <Text style={styles.inputLabel}>Last Name *</Text>
+                  <TextInput
+                    style={[styles.input, fieldErrors.lastName && styles.inputError]}
+                    value={lastName}
+                    onChangeText={(text) => {
+                      setLastName(text);
+                      if (fieldErrors.lastName) {
+                        const { lastName, ...rest } = fieldErrors;
+                        setFieldErrors(rest);
+                      }
+                    }}
+                    placeholder="Doe"
+                    autoComplete="family-name"
+                  />
+                  {fieldErrors.lastName && (
+                    <Text style={styles.inputErrorText}>{fieldErrors.lastName}</Text>
+                  )}
+                </View>
+
+                <View style={styles.inputContainer}>
+                  <Text style={styles.inputLabel}>Email Address *</Text>
+                  <TextInput
+                    style={[styles.input, fieldErrors.email && styles.inputError]}
+                    value={email}
+                    onChangeText={(text) => {
+                      setEmail(text.toLowerCase().trim());
+                      if (fieldErrors.email) {
+                        const { email, ...rest } = fieldErrors;
+                        setFieldErrors(rest);
+                      }
+                    }}
+                    placeholder="john.doe@example.com"
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoComplete="email"
+                  />
+                  {fieldErrors.email && (
+                    <Text style={styles.inputErrorText}>{fieldErrors.email}</Text>
+                  )}
+                </View>
+
+                <View style={styles.inputContainer}>
+                  <Text style={styles.inputLabel}>Password *</Text>
+                  <TextInput
+                    style={[styles.input, fieldErrors.password && styles.inputError]}
+                    value={password}
+                    onChangeText={(text) => {
+                      setPassword(text);
+                      if (fieldErrors.password) {
+                        const { password, ...rest } = fieldErrors;
+                        setFieldErrors(rest);
+                      }
+                    }}
+                    placeholder="Minimum 8 characters"
+                    secureTextEntry
+                    autoComplete="new-password"
+                  />
+                  {fieldErrors.password && (
+                    <Text style={styles.inputErrorText}>{fieldErrors.password}</Text>
+                  )}
+                </View>
+
+                <View style={styles.inputContainer}>
+                  <Text style={styles.inputLabel}>Confirm Password *</Text>
+                  <TextInput
+                    style={[styles.input, fieldErrors.confirmPassword && styles.inputError]}
+                    value={confirmPassword}
+                    onChangeText={(text) => {
+                      setConfirmPassword(text);
+                      if (fieldErrors.confirmPassword) {
+                        const { confirmPassword, ...rest } = fieldErrors;
+                        setFieldErrors(rest);
+                      }
+                    }}
+                    placeholder="Re-enter password"
+                    secureTextEntry
+                    autoComplete="new-password"
+                  />
+                  {fieldErrors.confirmPassword && (
+                    <Text style={styles.inputErrorText}>{fieldErrors.confirmPassword}</Text>
+                  )}
+                </View>
+              </View>
             </>
           )}
 
@@ -657,7 +808,7 @@ export default function KYCEligibilityScreen({ navigation }: KYCEligibilityScree
                   <ActivityIndicator color={colors.neutral.white} />
                 ) : (
                   <>
-                    <Text style={styles.continueButtonText}>Continue to Payment</Text>
+                    <Text style={styles.continueButtonText}>Create Account & Continue</Text>
                     <Ionicons name="arrow-forward" size={20} color={colors.neutral.white} />
                   </>
                 )}
@@ -710,6 +861,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.neutral.text.primary,
     marginBottom: 12,
+  },
+  sectionSubtext: {
+    fontSize: 14,
+    color: colors.neutral.text.secondary,
+    marginBottom: 16,
+    lineHeight: 20,
   },
   verificationOptions: {
     flexDirection: 'row',

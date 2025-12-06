@@ -113,13 +113,36 @@ export const vehicleAPI = {
 
 // Customer APIs
 export const customerAPI = {
+  // Register customer with complete KYC data (creates account + KYC in one step)
+  registerWithKYC: async (data: {
+    // Account credentials
+    email: string;
+    password: string;
+    firstName: string;
+    lastName: string;
+    // KYC identity data
+    phoneNumber: string;
+    emiratesId?: string | null;
+    passportNumber?: string | null;
+    passportCountry?: string | null;
+    licenseNumber: string;
+    driversLicenseCountry: string;
+    driversLicenseExpiry?: string;
+    nationality: string;
+    dateOfBirth?: string;
+    isTourist: boolean;
+  }): Promise<any> => {
+    const response = await api.post('/customers/register-with-kyc', data);
+    return response.data;
+  },
+
   updateKYC: async (kycData: {
     email: string;
     phoneNumber: string;
     emiratesId?: string | null;
     passportNumber?: string | null;
     passportCountry?: string | null;
-    driversId: string;
+    licenseNumber: string;
     driversLicenseCountry: string;
     driversLicenseExpiry?: string;
     nationality: string;
