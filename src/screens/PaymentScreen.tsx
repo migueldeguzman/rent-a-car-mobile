@@ -196,6 +196,23 @@ export default function PaymentScreen({ navigation }: PaymentScreenProps) {
         receiptNumber,
       };
 
+      // Determine debit account based on payment method
+      let debitAccount = '';
+      let debitAccountName = '';
+
+      if (paymentMethod === 'CREDIT_CARD' || paymentMethod === 'DEBIT_CARD') {
+        // Use specific card type clearing account
+        const cardTypeUpper = creditCardType.toUpperCase();
+        debitAccount = `1010-${cardTypeUpper}`;
+        debitAccountName = `${creditCardType} Clearing Account`;
+      } else if (paymentMethod === 'GOOGLE_PAY') {
+        debitAccount = '1010-GPAY';
+        debitAccountName = 'Google Pay Clearing Account';
+      } else if (paymentMethod === 'APPLE_PAY') {
+        debitAccount = '1010-APAY';
+        debitAccountName = 'Apple Pay Clearing Account';
+      }
+
       // Create accounting entry (Double-entry bookkeeping)
       const accountingEntry: AccountingEntry = {
         id: `ae-${Date.now()}`, // In production, this comes from database
@@ -207,14 +224,14 @@ export default function PaymentScreen({ navigation }: PaymentScreenProps) {
         referenceType: 'BOOKING',
         referenceId: 'pending', // Will be set after booking is created
 
-        // Debit side - Credit Card Clearing Account (Asset)
-        debitAccount: '1100-CC-CLEARING',
-        debitAccountName: 'Credit Card Clearing',
+        // Debit side - Payment Method Clearing Account (Asset)
+        debitAccount,
+        debitAccountName,
         debitAmount: totalAmount,
 
         // Credit side - Customer Account Receivable
-        creditAccount: `1200-CUST-${user?.id || 'guest'}`,
-        creditAccountName: `${user?.firstName || 'Customer'} ${user?.lastName || ''} - Receivable`,
+        creditAccount: `1200-${user?.email?.replace(/[^a-zA-Z0-9]/g, '-') || 'guest'}`,
+        creditAccountName: `${user?.firstName || 'Customer'} ${user?.lastName || ''} - AR`,
         creditAmount: totalAmount,
 
         // Audit trail
@@ -227,8 +244,8 @@ export default function PaymentScreen({ navigation }: PaymentScreenProps) {
       // Save payment and accounting entry to flow state
       setPaymentData(payment, accountingEntry);
 
-      // CRITICAL: Create booking in database
-      console.log('📝 Creating booking in database...');
+      // CRITICAL: Create booking in database WITH accounting entry
+      console.log('📝 Creating booking in database with accounting entry...');
       const booking = await bookingAPI.createBooking({
         vehicleId: flowState.vehicle?.id || '',
         startDate: flowState.rentalPeriod?.startDate || '',
@@ -238,8 +255,10 @@ export default function PaymentScreen({ navigation }: PaymentScreenProps) {
         addOns: flowState.selectedAddOns || [],
         notificationPreferences: notificationPrefs,
         notes: `Payment Receipt: ${receiptNumber}`,
+        accountingEntry: accountingEntry, // Send accounting entry to backend
       });
       console.log('✅ Booking created successfully:', booking.id);
+      console.log('✅ Accounting entry created for transaction:', entryNumber);
 
       // Move to Step 4: Confirmation
       nextStep();

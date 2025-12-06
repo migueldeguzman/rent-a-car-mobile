@@ -25,7 +25,20 @@
       "Bash(taskkill:*)",
       "Bash(awk:*)",
       "Bash(rm:*)",
-      "Bash(rmdir:*)"
+      "Bash(rmdir:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nRefactor: Separate backend into independent repository\n\nMajor architectural change to improve separation of concerns:\n\nBackend Changes:\n- Removed embedded backend from mobile app repository\n- Backend now lives in separate repo: client-backend\n- Deleted backend/src/, backend/package.json\n- Mobile app is now pure frontend code\n\nDocumentation:\n- Added ARCHITECTURE.md with system diagram\n- Added README_REFACTOR.md with migration notes\n- Updated CLAUDE.md with new repository structure\n- Documented 3-tier architecture (Mobile → API → Database)\n\nBenefits:\n- Independent deployment of frontend and backend\n- Better security (backend code not in mobile app)\n- Cleaner separation of concerns\n- Backend can serve multiple clients\n\nBackend Repository: https://github.com/migueldeguzman/client-backend.git\n\n🤖 Generated with Claude Code\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(findstr:*)",
+      "Bash(npm run test:*)",
+      "Bash(npm install axios)",
+      "Bash(xargs:*)",
+      "Bash(npm run web:*)",
+      "Bash(npx expo start:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nFix booking creation and add document number generation\n\nBackend Changes:\n- Fixed booking.controller.ts to use snake_case column names (payment_method, terms_accepted)\n- Added createdAt/updatedAt timestamps to prevent null constraint violations\n- Fixed booking_addons INSERT to match existing table schema\n- Commented out notification preferences (table doesn''t exist yet)\n- Created document-number.ts utility for sequential number generation (BOOK/REC/AGR)\n- Updated queries to use snake_case: booking_id instead of bookingId\n\nBug Fixes:\n- Resolved \"column paymentMethod does not exist\" error\n- Resolved \"null value in column updatedAt\" error\n- Resolved \"column id is of type uuid but expression is of type text\" error\n\nTesting:\n- Added test-booking-flow.ts for end-to-end booking validation\n- All tests passing: Login → Create Booking → Confirm → Verify\n\n🤖 Generated with Claude Code\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(git commit:*)",
+      "Bash(npm run migrate:identity:*)",
+      "Bash(timeout:*)",
+      "Bash(npm start)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []
