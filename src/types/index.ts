@@ -147,7 +147,7 @@ export interface KYCData {
   uaePassVerified?: boolean;
 
   // Manual input fields
-  email: string;
+  phoneNumber: string;
   emiratesId?: string | null; // For UAE residents
   passportNumber?: string | null; // For tourists
   passportCountry?: string | null; // Passport issuing country

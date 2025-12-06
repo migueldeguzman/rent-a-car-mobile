@@ -15,8 +15,10 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, gradients, financialFormatting } from '../theme/colors';
 import { useBookingFlow } from '../contexts/BookingFlowContext';
+import { useAuth } from '../contexts/AuthContext';
 import { KYCData } from '../types';
 import ProgressIndicator from '../components/ProgressIndicator';
+import { customerAPI } from '../services/api';
 
 interface KYCEligibilityScreenProps {
   navigation: any;
@@ -39,13 +41,14 @@ const CARD_TYPES = ['VISA', 'MASTERCARD', 'AMEX', 'OTHER'];
 
 export default function KYCEligibilityScreen({ navigation }: KYCEligibilityScreenProps) {
   const { flowState, setKYCData, nextStep, previousStep } = useBookingFlow();
+  const { user } = useAuth();
 
   // Verification method
   const [verificationType, setVerificationType] = useState<'UAE_PASS' | 'MANUAL'>('MANUAL');
   const [isProcessing, setIsProcessing] = useState(false);
 
   // Manual input fields
-  const [email, setEmail] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [isTourist, setIsTourist] = useState(false);
   const [emiratesId, setEmiratesId] = useState('');
   const [passportNumber, setPassportNumber] = useState('');
@@ -83,8 +86,8 @@ export default function KYCEligibilityScreen({ navigation }: KYCEligibilityScree
   };
 
   const validateForm = (): boolean => {
-    if (!email || !email.includes('@')) {
-      Alert.alert('Validation Error', 'Please enter a valid email address');
+    if (!phoneNumber || phoneNumber.length < 7) {
+      Alert.alert('Validation Error', 'Please enter a valid phone number');
       return false;
     }
 
@@ -128,32 +131,74 @@ export default function KYCEligibilityScreen({ navigation }: KYCEligibilityScree
     return true;
   };
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (!validateForm()) return;
 
-    const kycData: KYCData = {
-      verificationType,
-      email,
-      emiratesId: isTourist ? null : emiratesId,
-      passportNumber: isTourist ? passportNumber : null,
-      passportCountry: isTourist ? passportCountry : null,
-      driversId,
-      driversLicenseCountry,
-      driversLicenseExpiry: driversLicenseExpiry || undefined,
-      creditCardNumber, // Last 4 digits only
-      creditCardType,
-      cardHolderName,
-      bankProvider,
-      isTourist,
-      nationality,
-      dateOfBirth: dateOfBirth || undefined,
-      kycVerified: true,
-      verifiedAt: new Date().toISOString(),
-    };
+    setIsProcessing(true);
 
-    setKYCData(kycData);
-    nextStep(); // Go to Step 3: Payment
-    navigation.navigate('Payment');
+    try {
+      const kycData: KYCData = {
+        verificationType,
+        phoneNumber,
+        emiratesId: isTourist ? null : emiratesId,
+        passportNumber: isTourist ? passportNumber : null,
+        passportCountry: isTourist ? passportCountry : null,
+        driversId,
+        driversLicenseCountry,
+        driversLicenseExpiry: driversLicenseExpiry || undefined,
+        creditCardNumber, // Last 4 digits only
+        creditCardType,
+        cardHolderName,
+        bankProvider,
+        isTourist,
+        nationality,
+        dateOfBirth: dateOfBirth || undefined,
+        kycVerified: true,
+        verifiedAt: new Date().toISOString(),
+      };
+
+      console.log('📝 Saving KYC data to backend...');
+
+      // Save KYC data to backend
+      await customerAPI.updateKYC({
+        email: user?.email || '', // Get email from authenticated user
+        phoneNumber, // Add phone number from form
+        emiratesId: isTourist ? null : emiratesId,
+        passportNumber: isTourist ? passportNumber : null,
+        passportCountry: isTourist ? passportCountry : null,
+        driversId,
+        driversLicenseCountry,
+        driversLicenseExpiry: driversLicenseExpiry || undefined,
+        nationality,
+        dateOfBirth: dateOfBirth || undefined,
+        isTourist,
+        creditCardNumber,
+        creditCardType,
+        cardHolderName,
+        bankProvider,
+      });
+
+      console.log('✅ KYC data saved successfully');
+
+      // Save to flow context
+      setKYCData(kycData);
+
+      // Navigate to payment
+      nextStep(); // Go to Step 3: Payment
+      navigation.navigate('Payment');
+    } catch (error: any) {
+      console.error('❌ Error saving KYC data:', error);
+
+      const errorMessage = error.response?.data?.message || 'Failed to save KYC information. Please try again.';
+
+      if (Platform.OS === 'web') {
+        window.alert(`Error: ${errorMessage}`);
+      } else {
+        Alert.alert('Error', errorMessage);
+      }
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleBack = () => {
@@ -313,15 +358,14 @@ export default function KYCEligibilityScreen({ navigation }: KYCEligibilityScree
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Contact Information</Text>
                 <View style={styles.inputContainer}>
-                  <Text style={styles.inputLabel}>Email Address *</Text>
+                  <Text style={styles.inputLabel}>Phone Number *</Text>
                   <TextInput
                     style={styles.input}
-                    value={email}
-                    onChangeText={setEmail}
-                    placeholder="your.email@example.com"
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    autoComplete="email"
+                    value={phoneNumber}
+                    onChangeText={setPhoneNumber}
+                    placeholder="+971 50 123 4567"
+                    keyboardType="phone-pad"
+                    autoComplete="tel"
                   />
                 </View>
               </View>

@@ -111,6 +111,30 @@ export const vehicleAPI = {
   },
 };
 
+// Customer APIs
+export const customerAPI = {
+  updateKYC: async (kycData: {
+    email: string;
+    phoneNumber: string;
+    emiratesId?: string | null;
+    passportNumber?: string | null;
+    passportCountry?: string | null;
+    driversId: string;
+    driversLicenseCountry: string;
+    driversLicenseExpiry?: string;
+    nationality: string;
+    dateOfBirth?: string;
+    isTourist: boolean;
+    creditCardNumber: string;
+    creditCardType: string;
+    cardHolderName: string;
+    bankProvider: string;
+  }): Promise<any> => {
+    const response = await api.put('/customers/kyc/update', kycData);
+    return response.data;
+  },
+};
+
 // Booking APIs
 export const bookingAPI = {
   createBooking: async (data: {
