@@ -14,9 +14,10 @@ import {
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Vehicle, AddOn, NotificationPreferences, PriceBreakdown } from '../types';
-import { bookingAPI } from '../services/api';
+import { useBookingFlow } from '../contexts/BookingFlowContext';
 import { colors, gradients, financialFormatting } from '../theme/colors';
 import { Ionicons } from '@expo/vector-icons';
+import ProgressIndicator from '../components/ProgressIndicator';
 
 interface BookingScreenProps {
   navigation: any;
@@ -37,6 +38,7 @@ type RentalPeriodOption = '1_MONTH' | '3_MONTHS' | '6_MONTHS' | 'CUSTOM';
 
 export default function BookingScreen({ navigation, route }: BookingScreenProps) {
   const { vehicle } = route.params;
+  const { setVehicleSelection, nextStep } = useBookingFlow();
   const [startDate, setStartDate] = useState(new Date());
   const [endDate, setEndDate] = useState(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)); // Default to 1 month
   const [showStartPicker, setShowStartPicker] = useState(false);
@@ -283,56 +285,40 @@ export default function BookingScreen({ navigation, route }: BookingScreenProps)
         });
 
     if (confirmed) {
-      const processBooking = async () => {
-            setIsLoading(true);
-            try {
-              // Prepare booking data with all new fields
-              const bookingData = {
-                vehicleId: vehicle.id,
-                startDate: startDate.toISOString(),
-                endDate: endDate.toISOString(),
-                notes: `Booking for ${vehicle.make} ${vehicle.model} - ${periodLabel}\n` +
-                       `Monthly Rate: ${financialFormatting.formatCurrency(rateCalculation.monthlyRate)}/month\n` +
-                       `Add-ons: ${selectedAddOns.map(a => a.name).join(', ') || 'None'}\n` +
-                       `Total with VAT: ${financialFormatting.formatCurrency(priceBreakdown.totalWithVat)}`,
-                termsAccepted,
-                addOns: selectedAddOns,
-                notificationPreferences: notificationPrefs,
-              };
+      setIsLoading(true);
+      try {
+        // Save Step 1 data to BookingFlowContext
+        const selectedAddOns = addOns.filter(addon => addon.selected);
 
-              // Step 1: Create the booking (status will be PENDING)
-              const booking = await bookingAPI.createBooking(bookingData);
+        setVehicleSelection(
+          vehicle,
+          {
+            startDate: startDate.toISOString(),
+            endDate: endDate.toISOString(),
+            totalDays: rateCalculation.totalDays,
+            monthlyPeriods: rateCalculation.months,
+            remainingDays: rateCalculation.totalDays % 30,
+          },
+          selectedAddOns,
+          priceBreakdown
+        );
 
-              // Step 2: Confirm the booking (NO invoice - that's created later when converting to agreement)
-              const { booking: confirmedBooking } = await bookingAPI.confirmBooking(booking.id);
+        console.log('✅ Vehicle selection saved to context');
 
-              // Navigate to confirmation screen with booking details
-              navigation.navigate('BookingConfirmation', {
-                booking: confirmedBooking,
-                priceBreakdown,
-              });
-            } catch (error: any) {
-              console.error('❌ Booking error:', error);
-              console.error('Error response:', error.response?.data);
-              console.error('Error message:', error.message);
+        // Move to Step 2: KYC/Eligibility
+        nextStep();
+        navigation.navigate('KYCEligibility');
+      } catch (error: any) {
+        console.error('❌ Error saving vehicle selection:', error);
 
-              const errorMessage = error.response?.data?.message || error.message || 'Could not create booking. Please try again.';
-
-              if (Platform.OS === 'web') {
-                window.alert('Booking Failed: ' + errorMessage);
-              } else {
-                Alert.alert(
-                  'Booking Failed',
-                  errorMessage,
-                  [{ text: 'OK', style: 'default' }]
-                );
-              }
-            } finally {
-              setIsLoading(false);
-            }
-      };
-
-      await processBooking();
+        if (Platform.OS === 'web') {
+          window.alert('Error: Could not proceed to next step');
+        } else {
+          Alert.alert('Error', 'Could not proceed to next step');
+        }
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -342,6 +328,8 @@ export default function BookingScreen({ navigation, route }: BookingScreenProps)
   };
 
   return (
+    <>
+      <ProgressIndicator currentStep={1} />
       <ScrollView
         style={styles.container}
         contentContainerStyle={styles.scrollContent}
@@ -767,6 +755,7 @@ export default function BookingScreen({ navigation, route }: BookingScreenProps)
         </TouchableOpacity>
       </View>
     </ScrollView>
+    </>
   );
 }
 

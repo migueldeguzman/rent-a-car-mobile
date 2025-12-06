@@ -6,6 +6,7 @@ import { ActivityIndicator, View, StyleSheet } from 'react-native';
 
 // Context
 import { AuthProvider, useAuth } from './src/contexts/AuthContext';
+import { BookingFlowProvider } from './src/contexts/BookingFlowContext';
 
 // Components
 import CustomScrollbar from './src/components/CustomScrollbar';
@@ -15,6 +16,8 @@ import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
 import VehicleListScreen from './src/screens/VehicleListScreen';
 import BookingScreen from './src/screens/BookingScreen';
+import KYCEligibilityScreen from './src/screens/KYCEligibilityScreen';
+import PaymentScreen from './src/screens/PaymentScreen';
 import BookingConfirmationScreen from './src/screens/BookingConfirmationScreen';
 
 const Stack = createStackNavigator();
@@ -63,17 +66,27 @@ function Navigation() {
           }}
         />
 
-        {/* Protected screens - require authentication check */}
+        {/* Four-Step Booking Flow */}
         <Stack.Screen
           name="Booking"
           component={BookingScreen}
-          options={{ title: 'Book Vehicle' }}
+          options={{ title: 'Step 1: Select Vehicle' }}
+        />
+        <Stack.Screen
+          name="KYCEligibility"
+          component={KYCEligibilityScreen}
+          options={{ title: 'Step 2: Verify Eligibility' }}
+        />
+        <Stack.Screen
+          name="Payment"
+          component={PaymentScreen}
+          options={{ title: 'Step 3: Payment' }}
         />
         <Stack.Screen
           name="BookingConfirmation"
           component={BookingConfirmationScreen}
           options={{
-            title: 'Booking Confirmed',
+            title: 'Step 4: Confirmed',
             headerLeft: () => null,
           }}
         />
@@ -85,9 +98,11 @@ function Navigation() {
 export default function App() {
   return (
     <AuthProvider>
-      <StatusBar style="auto" />
-      <Navigation />
-      <CustomScrollbar />
+      <BookingFlowProvider>
+        <StatusBar style="auto" />
+        <Navigation />
+        <CustomScrollbar />
+      </BookingFlowProvider>
     </AuthProvider>
   );
 }

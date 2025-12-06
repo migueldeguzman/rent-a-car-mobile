@@ -1,458 +1,547 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   View,
   Text,
+  ScrollView,
   TouchableOpacity,
   StyleSheet,
-  ScrollView,
   Platform,
+  Share,
 } from 'react-native';
-import { Booking } from '../types';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
+import { colors, gradients, financialFormatting } from '../theme/colors';
+import { useBookingFlow } from '../contexts/BookingFlowContext';
+import { useAuth } from '../contexts/AuthContext';
+import ProgressIndicator from '../components/ProgressIndicator';
 
 interface BookingConfirmationScreenProps {
   navigation: any;
-  route: {
-    params: {
-      booking: Booking;
-      invoice?: any; // Invoice object from backend
-    };
-  };
 }
 
-export default function BookingConfirmationScreen({
-  navigation,
-  route,
-}: BookingConfirmationScreenProps) {
-  const { booking, invoice } = route.params;
+export default function BookingConfirmationScreen({ navigation }: BookingConfirmationScreenProps) {
+  const { flowState, resetFlow } = useBookingFlow();
+  const { user } = useAuth();
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
+  // Format date for display
+  const formatDate = (dateString?: string): string => {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      weekday: 'long',
       year: 'numeric',
+      month: 'long',
+      day: 'numeric',
     });
   };
 
-  const handleBackToHome = () => {
-    navigation.navigate('VehicleList');
+  const formatTime = (dateString?: string): string => {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    return date.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  const receiptNumber = flowState.paymentData?.receiptNumber || 'N/A';
+  const transactionId = flowState.paymentData?.transactionId || 'N/A';
+  const transactionDate = flowState.paymentData?.transactionDate;
+  const paymentMethod = flowState.paymentData?.paymentMethod || 'N/A';
+  const totalAmount = flowState.paymentData?.amount || 0;
+
+  const vehicleInfo = `${flowState.vehicle?.make} ${flowState.vehicle?.model} ${flowState.vehicle?.year}`;
+  const rentalPeriod = `${formatDate(flowState.rentalPeriod?.startDate)} - ${formatDate(flowState.rentalPeriod?.endDate)}`;
+
+  useEffect(() => {
+    // In production, send final booking data to backend
+    // await bookingAPI.createBooking({ ...flowState });
+  }, []);
+
+  const handleDownloadReceipt = async () => {
+    // In production, generate and download PDF receipt
+    if (Platform.OS === 'web') {
+      window.alert('PDF receipt download will be implemented in the next phase.');
+    } else {
+      alert('PDF receipt download will be implemented in the next phase.');
+    }
+  };
+
+  const handleShareReceipt = async () => {
+    const receiptText = `
+Booking Confirmation - Vesla Rent-a-Car
+
+Receipt: ${receiptNumber}
+Transaction: ${transactionId}
+Date: ${formatDate(transactionDate)}
+
+Vehicle: ${vehicleInfo}
+Rental Period: ${rentalPeriod}
+Total Days: ${flowState.rentalPeriod?.totalDays}
+
+Amount Paid: ${financialFormatting.formatCurrency(totalAmount)}
+Payment Method: ${paymentMethod}
+
+Thank you for choosing Vesla Rent-a-Car!
+    `;
+
+    try {
+      if (Platform.OS === 'web') {
+        await navigator.clipboard.writeText(receiptText);
+        alert('Receipt details copied to clipboard!');
+      } else {
+        await Share.share({
+          message: receiptText,
+          title: 'Booking Receipt',
+        });
+      }
+    } catch (error) {
+      console.error('Error sharing receipt:', error);
+    }
+  };
+
+  const handleDone = () => {
+    resetFlow(); // Clear booking flow state
+    navigation.navigate('VehicleList'); // Return to vehicle list
+  };
+
+  const handleViewBookings = () => {
+    resetFlow();
+    navigation.navigate('BookingHistory'); // Navigate to booking history (if exists)
   };
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.scrollContent}
-      keyboardShouldPersistTaps="handled"
-      scrollEnabled={true}
-      showsVerticalScrollIndicator={true}
-    >
-      <View style={styles.content}>
-        {/* Success Icon */}
-        <View style={styles.successIcon}>
-          <Text style={styles.successIconText}>✓</Text>
-        </View>
+    <View style={styles.container}>
+      <ProgressIndicator currentStep={4} />
 
-        <Text style={styles.successTitle}>Booking Confirmed!</Text>
-        <Text style={styles.successSubtitle}>
-          Your booking has been successfully confirmed and invoice generated
-        </Text>
-
-        {/* Invoice Details Card */}
-        {invoice && (
-          <View style={styles.invoiceCard}>
-            <Text style={styles.cardTitle}>Invoice Generated</Text>
-
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Invoice Number</Text>
-              <Text style={styles.detailValue}>{invoice.invoiceNumber}</Text>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={Platform.OS !== 'web'}
+      >
+        <View style={styles.content}>
+          {/* Success Icon */}
+          <View style={styles.successContainer}>
+            <View style={styles.successIconCircle}>
+              <Ionicons name="checkmark-circle" size={80} color={colors.financial.positive} />
             </View>
+            <Text style={styles.successTitle}>Booking Confirmed!</Text>
+            <Text style={styles.successSubtitle}>
+              Your payment has been processed successfully
+            </Text>
+          </View>
 
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Invoice Date</Text>
-              <Text style={styles.detailValue}>{formatDate(invoice.invoiceDate)}</Text>
-            </View>
-
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Due Date</Text>
-              <Text style={styles.detailValue}>{formatDate(invoice.dueDate)}</Text>
+          {/* Receipt Card */}
+          <View style={styles.receiptCard}>
+            <View style={styles.receiptHeader}>
+              <Ionicons name="receipt-outline" size={32} color={colors.primary.main} />
+              <View style={styles.receiptHeaderText}>
+                <Text style={styles.receiptTitle}>Payment Receipt</Text>
+                <Text style={styles.receiptNumber}>#{receiptNumber}</Text>
+              </View>
             </View>
 
             <View style={styles.divider} />
 
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Subtotal</Text>
-              <Text style={styles.detailValue}>
-                AED {parseFloat(invoice.subtotal).toFixed(2)}
-              </Text>
-            </View>
-
-            {invoice.taxAmount > 0 && (
+            {/* Transaction Details */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Transaction Details</Text>
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>VAT (5%)</Text>
+                <Text style={styles.detailLabel}>Transaction ID:</Text>
+                <Text style={styles.detailValue}>{transactionId}</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Date & Time:</Text>
                 <Text style={styles.detailValue}>
-                  AED {parseFloat(invoice.taxAmount).toFixed(2)}
+                  {formatDate(transactionDate)} at {formatTime(transactionDate)}
                 </Text>
               </View>
-            )}
-
-            <View style={[styles.detailRow, styles.totalRow]}>
-              <Text style={styles.totalLabel}>Total Amount</Text>
-              <Text style={styles.totalValue}>
-                AED {parseFloat(invoice.totalAmount).toFixed(2)}
-              </Text>
-            </View>
-
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Status</Text>
-              <View style={styles.invoiceStatusBadge}>
-                <Text style={styles.invoiceStatusText}>{invoice.status}</Text>
-              </View>
-            </View>
-          </View>
-        )}
-
-        {/* Booking Details Card */}
-        <View style={styles.detailsCard}>
-          <Text style={styles.cardTitle}>Booking Details</Text>
-
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Booking Number</Text>
-            <Text style={styles.detailValue}>{booking.bookingNumber}</Text>
-          </View>
-
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Status</Text>
-            <View style={styles.statusBadge}>
-              <Text style={styles.statusText}>{booking.status}</Text>
-            </View>
-          </View>
-
-          <View style={styles.divider} />
-
-          {booking.vehicle && (
-            <>
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Vehicle</Text>
+                <Text style={styles.detailLabel}>Payment Method:</Text>
                 <Text style={styles.detailValue}>
-                  {booking.vehicle.make} {booking.vehicle.model}
+                  {paymentMethod.replace('_', ' ')}
                 </Text>
               </View>
-
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Plate Number</Text>
-                <Text style={styles.detailValue}>{booking.vehicle.plateNumber}</Text>
+                <Text style={styles.detailLabel}>Status:</Text>
+                <View style={styles.statusBadge}>
+                  <Ionicons name="checkmark-circle" size={16} color={colors.financial.positive} />
+                  <Text style={styles.statusText}>COMPLETED</Text>
+                </View>
               </View>
-            </>
-          )}
+            </View>
 
-          <View style={styles.divider} />
+            <View style={styles.divider} />
 
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Start Date</Text>
-            <Text style={styles.detailValue}>{formatDate(booking.startDate)}</Text>
+            {/* Booking Details */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Booking Details</Text>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Customer:</Text>
+                <Text style={styles.detailValue}>
+                  {user?.firstName} {user?.lastName}
+                </Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Email:</Text>
+                <Text style={styles.detailValue}>{user?.email}</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Vehicle:</Text>
+                <Text style={styles.detailValue}>{vehicleInfo}</Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Rental Period:</Text>
+                <Text style={styles.detailValue}>
+                  {flowState.rentalPeriod?.totalDays} days
+                </Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Start Date:</Text>
+                <Text style={styles.detailValue}>
+                  {formatDate(flowState.rentalPeriod?.startDate)}
+                </Text>
+              </View>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>End Date:</Text>
+                <Text style={styles.detailValue}>
+                  {formatDate(flowState.rentalPeriod?.endDate)}
+                </Text>
+              </View>
+              {flowState.selectedAddOns && flowState.selectedAddOns.length > 0 && (
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Add-ons:</Text>
+                  <Text style={styles.detailValue}>
+                    {flowState.selectedAddOns.map(a => a.name).join(', ')}
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            <View style={styles.divider} />
+
+            {/* Payment Summary - NO ACCOUNTING ENTRY SHOWN */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Payment Summary</Text>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Vehicle Rental:</Text>
+                <Text style={styles.detailValue}>
+                  {financialFormatting.formatCurrency(flowState.priceBreakdown?.subtotal || 0)}
+                </Text>
+              </View>
+              {flowState.priceBreakdown?.addOnsTotal && flowState.priceBreakdown.addOnsTotal > 0 && (
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Add-ons:</Text>
+                  <Text style={styles.detailValue}>
+                    {financialFormatting.formatCurrency(flowState.priceBreakdown.addOnsTotal)}
+                  </Text>
+                </View>
+              )}
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Subtotal:</Text>
+                <Text style={styles.detailValue}>
+                  {financialFormatting.formatCurrency(
+                    (flowState.priceBreakdown?.subtotal || 0) + (flowState.priceBreakdown?.addOnsTotal || 0)
+                  )}
+                </Text>
+              </View>
+              <View style={[styles.detailRow, styles.vatRow]}>
+                <Text style={styles.vatLabel}>VAT (5%):</Text>
+                <Text style={styles.vatValue}>
+                  {financialFormatting.formatCurrency(flowState.priceBreakdown?.vatAmount || 0)}
+                </Text>
+              </View>
+              <View style={[styles.detailRow, styles.totalRow]}>
+                <Text style={styles.totalLabel}>Total Paid:</Text>
+                <Text style={styles.totalValue}>
+                  {financialFormatting.formatCurrency(totalAmount)}
+                </Text>
+              </View>
+            </View>
           </View>
 
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>End Date</Text>
-            <Text style={styles.detailValue}>{formatDate(booking.endDate)}</Text>
+          {/* Action Buttons */}
+          <View style={styles.actionButtons}>
+            <TouchableOpacity style={styles.actionButton} onPress={handleDownloadReceipt}>
+              <Ionicons name="download-outline" size={24} color={colors.primary.main} />
+              <Text style={styles.actionButtonText}>Download PDF</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.actionButton} onPress={handleShareReceipt}>
+              <Ionicons name="share-social-outline" size={24} color={colors.primary.main} />
+              <Text style={styles.actionButtonText}>Share Receipt</Text>
+            </TouchableOpacity>
           </View>
 
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Total Days</Text>
-            <Text style={styles.detailValue}>{booking.totalDays} days</Text>
-          </View>
-
-          <View style={styles.divider} />
-
-          {/* Rate Breakdown */}
-          {booking.monthlyPeriods > 0 && (
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>
-                {booking.monthlyPeriods} month{booking.monthlyPeriods > 1 ? 's' : ''}
+          {/* Important Information */}
+          <View style={styles.infoBox}>
+            <Ionicons name="information-circle" size={24} color={colors.financial.info} />
+            <View style={styles.infoContent}>
+              <Text style={styles.infoTitle}>What's Next?</Text>
+              <Text style={styles.infoText}>
+                • A confirmation email has been sent to {user?.email}
               </Text>
-              <Text style={styles.detailValue}>
-                AED {(booking.monthlyPeriods * parseFloat(booking.monthlyRate)).toFixed(2)}
+              <Text style={styles.infoText}>
+                • Please bring your driver's license and Emirates ID/Passport when picking up the vehicle
+              </Text>
+              <Text style={styles.infoText}>
+                • Vehicle inspection will be conducted at pickup
+              </Text>
+              <Text style={styles.infoText}>
+                • You can view this booking in your booking history
               </Text>
             </View>
-          )}
+          </View>
 
-          {booking.remainingDays > 0 && (
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>
-                {booking.remainingDays} day{booking.remainingDays > 1 ? 's' : ''}
-              </Text>
-              <Text style={styles.detailValue}>
-                AED {(booking.remainingDays * parseFloat(booking.dailyRate)).toFixed(2)}
-              </Text>
-            </View>
-          )}
+          {/* Navigation Buttons */}
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity style={styles.secondaryButton} onPress={handleViewBookings}>
+              <Ionicons name="list-outline" size={20} color={colors.primary.main} />
+              <Text style={styles.secondaryButtonText}>View My Bookings</Text>
+            </TouchableOpacity>
 
-          <View style={[styles.detailRow, styles.totalRow]}>
-            <Text style={styles.totalLabel}>Rental Amount</Text>
-            <Text style={styles.totalValue}>
-              AED {parseFloat(booking.totalAmount).toFixed(2)}
-            </Text>
+            <TouchableOpacity style={styles.primaryButton} onPress={handleDone}>
+              <LinearGradient
+                colors={gradients.primaryButton.colors}
+                start={gradients.primaryButton.start}
+                end={gradients.primaryButton.end}
+                style={styles.primaryButtonGradient}
+              >
+                <Text style={styles.primaryButtonText}>Done</Text>
+                <Ionicons name="home-outline" size={20} color={colors.neutral.white} />
+              </LinearGradient>
+            </TouchableOpacity>
           </View>
         </View>
-
-        {/* Invoice Items */}
-        {invoice?.items && invoice.items.length > 0 && (
-          <View style={styles.itemsCard}>
-            <Text style={styles.cardTitle}>Invoice Items</Text>
-            {invoice.items.map((item: any, index: number) => (
-              <View key={index} style={styles.itemRow}>
-                <Text style={styles.itemDescription}>{item.description}</Text>
-                <Text style={styles.itemAmount}>
-                  AED {parseFloat(item.amount).toFixed(2)}
-                </Text>
-              </View>
-            ))}
-          </View>
-        )}
-
-        {/* Info Box */}
-        <View style={styles.infoBox}>
-          <Text style={styles.infoTitle}>What's Next?</Text>
-          <Text style={styles.infoText}>
-            • Your booking is CONFIRMED with invoice {invoice?.invoiceNumber}
-          </Text>
-          <Text style={styles.infoText}>
-            • The invoice has been posted to the accounting system
-          </Text>
-          <Text style={styles.infoText}>
-            • Payment is due by {invoice ? formatDate(invoice.dueDate) : 'TBD'}
-          </Text>
-          <Text style={styles.infoText}>
-            • Present this booking number at pickup: {booking.bookingNumber}
-          </Text>
-        </View>
-
-        {/* Action Buttons */}
-        <TouchableOpacity style={styles.primaryButton} onPress={handleBackToHome}>
-          <Text style={styles.primaryButtonText}>Back to Vehicles</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.secondaryButton}
-          onPress={() => navigation.navigate('VehicleList')}
-        >
-          <Text style={styles.secondaryButtonText}>Book Another Vehicle</Text>
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: colors.neutral.background,
+  },
+  scrollView: {
+    flex: 1,
   },
   scrollContent: {
     flexGrow: 1,
-    minHeight: Platform.OS === 'web' ? '100vh' : undefined,
-    paddingBottom: 20,
+    paddingBottom: 40,
   },
   content: {
     padding: 20,
-    paddingTop: 40,
-    paddingBottom: 40,
-  },
-  successIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#4CAF50',
-    alignItems: 'center',
-    justifyContent: 'center',
+    maxWidth: 700,
+    width: '100%',
     alignSelf: 'center',
-    marginBottom: 20,
   },
-  successIconText: {
-    fontSize: 48,
-    color: '#fff',
-    fontWeight: 'bold',
+  successContainer: {
+    alignItems: 'center',
+    paddingVertical: 32,
+  },
+  successIconCircle: {
+    marginBottom: 16,
   },
   successTitle: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#333',
-    textAlign: 'center',
+    color: colors.financial.positive,
     marginBottom: 8,
   },
   successSubtitle: {
     fontSize: 16,
-    color: '#666',
+    color: colors.neutral.text.secondary,
     textAlign: 'center',
-    marginBottom: 30,
   },
-  invoiceCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
+  receiptCard: {
+    backgroundColor: colors.ui.cardBackground,
+    borderRadius: 16,
     padding: 20,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    borderTopWidth: 4,
-    borderTopColor: '#4CAF50',
+    marginBottom: 24,
+    ...colors.shadows.large,
   },
-  detailsCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 20,
+  receiptHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
     marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
-  itemsCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+  receiptHeaderText: {
+    flex: 1,
   },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
+  receiptTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: colors.neutral.text.primary,
+  },
+  receiptNumber: {
+    fontSize: 14,
+    color: colors.neutral.text.secondary,
+    marginTop: 4,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: colors.neutral.divider,
+    marginVertical: 20,
+  },
+  section: {
     marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.primary.main,
+    marginBottom: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   detailRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 10,
+    alignItems: 'flex-start',
+    paddingVertical: 8,
   },
   detailLabel: {
     fontSize: 14,
-    color: '#666',
+    color: colors.neutral.text.secondary,
     flex: 1,
   },
   detailValue: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#333',
-    textAlign: 'right',
+    color: colors.neutral.text.primary,
     flex: 1,
+    textAlign: 'right',
   },
   statusBadge: {
-    backgroundColor: '#4CAF50',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.financial.positive + '10',
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 12,
   },
   statusText: {
-    color: '#fff',
     fontSize: 12,
     fontWeight: '600',
+    color: colors.financial.positive,
   },
-  invoiceStatusBadge: {
-    backgroundColor: '#2196F3',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
+  vatRow: {
+    backgroundColor: colors.financial.vat + '10',
+    marginHorizontal: -20,
+    paddingHorizontal: 20,
   },
-  invoiceStatusText: {
-    color: '#fff',
-    fontSize: 12,
+  vatLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: colors.financial.vat,
+  },
+  vatValue: {
+    fontSize: 14,
     fontWeight: '600',
-  },
-  divider: {
-    height: 1,
-    backgroundColor: '#e0e0e0',
-    marginVertical: 12,
+    color: colors.financial.vat,
   },
   totalRow: {
     borderTopWidth: 2,
-    borderTopColor: '#007AFF',
-    marginTop: 12,
-    paddingTop: 16,
+    borderTopColor: colors.neutral.divider,
+    marginTop: 8,
+    paddingTop: 12,
   },
   totalLabel: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-  },
-  totalValue: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#007AFF',
-  },
-  itemRow: {
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  itemDescription: {
-    fontSize: 14,
-    color: '#333',
-    marginBottom: 4,
-    lineHeight: 20,
-  },
-  itemAmount: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#007AFF',
+    color: colors.neutral.text.primary,
   },
-  infoBox: {
-    backgroundColor: '#E8F4F8',
+  totalValue: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: colors.financial.positive,
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 24,
+  },
+  actionButton: {
+    flex: 1,
+    backgroundColor: colors.ui.cardBackground,
+    borderWidth: 1,
+    borderColor: colors.neutral.border,
     borderRadius: 12,
     padding: 16,
-    marginBottom: 20,
+    alignItems: 'center',
+    gap: 8,
+    ...colors.shadows.small,
+  },
+  actionButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.primary.main,
+  },
+  infoBox: {
+    flexDirection: 'row',
+    backgroundColor: colors.financial.info + '10',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 24,
     borderLeftWidth: 4,
-    borderLeftColor: '#007AFF',
+    borderLeftColor: colors.financial.info,
+  },
+  infoContent: {
+    flex: 1,
+    marginLeft: 12,
   },
   infoTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
-    marginBottom: 12,
+    color: colors.neutral.text.primary,
+    marginBottom: 8,
   },
   infoText: {
     fontSize: 14,
-    color: '#666',
-    marginBottom: 6,
+    color: colors.neutral.text.secondary,
     lineHeight: 20,
+    marginBottom: 4,
   },
-  primaryButton: {
-    backgroundColor: '#007AFF',
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginBottom: 12,
-    shadowColor: '#007AFF',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  primaryButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+  buttonContainer: {
+    flexDirection: 'row',
+    gap: 12,
   },
   secondaryButton: {
-    backgroundColor: '#fff',
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.ui.cardBackground,
+    borderWidth: 2,
+    borderColor: colors.primary.main,
     borderRadius: 12,
     paddingVertical: 16,
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#007AFF',
-    marginBottom: 30,
+    gap: 8,
   },
   secondaryButtonText: {
-    color: '#007AFF',
+    color: colors.primary.main,
     fontSize: 16,
     fontWeight: '600',
+  },
+  primaryButton: {
+    flex: 1,
+    borderRadius: 12,
+    overflow: 'hidden',
+    ...colors.shadows.large,
+  },
+  primaryButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    gap: 8,
+  },
+  primaryButtonText: {
+    color: colors.neutral.white,
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });

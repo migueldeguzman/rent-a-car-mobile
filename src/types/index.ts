@@ -133,3 +133,176 @@ export interface PriceBreakdown {
   addOnsTotal?: number;
   grandTotal: number;
 }
+
+/**
+ * KYC/Eligibility Data - Step 2 of Booking Flow
+ * Customer verification information for rental eligibility
+ */
+export interface KYCData {
+  // Method of verification
+  verificationType: 'UAE_PASS' | 'MANUAL';
+
+  // UAE Pass data (if using UAE Pass)
+  uaePassToken?: string;
+  uaePassVerified?: boolean;
+
+  // Manual input fields
+  email: string;
+  emiratesId?: string | null; // For UAE residents
+  passportNumber?: string | null; // For tourists
+  passportCountry?: string | null; // Passport issuing country
+  driversId: string; // Driver's license number (required for all)
+  driversLicenseCountry?: string; // License issuing country
+  driversLicenseExpiry?: string; // Expiry date
+
+  // Payment information
+  creditCardNumber?: string; // Last 4 digits only for security
+  creditCardType?: 'VISA' | 'MASTERCARD' | 'AMEX' | 'OTHER';
+  cardHolderName?: string;
+  bankProvider?: string; // e.g., "Emirates NBD", "ADCB", "Dubai Islamic Bank"
+
+  // Additional info
+  isTourist: boolean; // TRUE if passport holder, FALSE if Emirates ID holder
+  nationality: string;
+  dateOfBirth?: string;
+
+  // Verification status
+  kycVerified: boolean;
+  verifiedAt?: string;
+}
+
+/**
+ * Payment Information - Step 3 of Booking Flow
+ * Payment processing and accounting entry data
+ */
+export interface PaymentData {
+  // Payment details
+  paymentMethod: 'CREDIT_CARD' | 'DEBIT_CARD' | 'BANK_TRANSFER' | 'CASH';
+  amount: number; // Total amount charged
+  currency: string; // Default "AED"
+
+  // Card details (if card payment)
+  cardLast4?: string;
+  cardType?: string;
+  cardHolderName?: string;
+
+  // Transaction details
+  transactionId?: string; // Payment gateway transaction ID
+  transactionDate: string;
+  transactionStatus: 'PENDING' | 'COMPLETED' | 'FAILED' | 'REFUNDED';
+
+  // Receipt information
+  receiptNumber: string;
+  receiptUrl?: string; // PDF receipt URL
+
+  // Accounting entry reference
+  accountingEntryId?: string; // Links to accounting_entries table
+}
+
+/**
+ * Accounting Entry - Double-entry bookkeeping
+ * Generated during Step 3 (Payment)
+ */
+export interface AccountingEntry {
+  id: string;
+  companyId: string;
+
+  // Entry metadata
+  entryNumber: string; // e.g., "JE-2024-001"
+  entryDate: string;
+  entryType: 'PAYMENT' | 'REFUND' | 'ADJUSTMENT';
+  description: string;
+
+  // Reference to booking
+  referenceType: 'BOOKING' | 'INVOICE' | 'REFUND';
+  referenceId: string; // booking.id or invoice.id
+
+  // Debit side - Credit Card Clearing Account
+  debitAccount: string; // Account code (e.g., "1100-CC-CLEARING")
+  debitAccountName: string; // "Credit Card Clearing"
+  debitAmount: number;
+
+  // Credit side - Customer Account (AR)
+  creditAccount: string; // Customer-specific account code (e.g., "1200-CUST-{customerId}")
+  creditAccountName: string; // Customer name (e.g., "John Doe - Receivable")
+  creditAmount: number;
+
+  // Audit trail
+  createdBy?: string; // User ID who processed payment
+  createdAt: string;
+  updatedAt?: string;
+
+  // Status
+  status: 'DRAFT' | 'POSTED' | 'REVERSED';
+  postedAt?: string;
+  reversedAt?: string;
+  reversalReason?: string;
+}
+
+/**
+ * Booking Flow State - Tracks progress through 4 steps
+ */
+export interface BookingFlowState {
+  currentStep: 1 | 2 | 3 | 4;
+
+  // Step 1: Vehicle Selection
+  vehicle?: Vehicle;
+  rentalPeriod?: {
+    startDate: string;
+    endDate: string;
+    totalDays: number;
+    monthlyPeriods: number;
+    remainingDays: number;
+  };
+  selectedAddOns?: AddOn[];
+  priceBreakdown?: PriceBreakdown;
+
+  // Step 2: KYC/Eligibility
+  kycData?: KYCData;
+
+  // Step 3: Payment
+  paymentData?: PaymentData;
+  accountingEntry?: AccountingEntry;
+
+  // Step 4: Confirmation
+  booking?: Booking;
+  receiptUrl?: string;
+
+  // Metadata
+  startedAt?: string;
+  completedAt?: string;
+  lastUpdatedAt?: string;
+}
+
+/**
+ * Receipt Data - Generated after payment
+ */
+export interface Receipt {
+  receiptNumber: string;
+  receiptDate: string;
+
+  // Customer info
+  customerName: string;
+  customerEmail: string;
+  customerId: string;
+
+  // Booking info
+  bookingNumber: string;
+  vehicleInfo: string; // e.g., "Toyota Camry 2023"
+  rentalPeriod: string; // e.g., "Jan 1, 2024 - Jan 31, 2024"
+
+  // Payment breakdown
+  subtotal: number;
+  vatAmount: number;
+  totalAmount: number;
+  amountPaid: number;
+  paymentMethod: string;
+
+  // Accounting reference
+  accountingEntryNumber: string;
+  debitAccount: string;
+  creditAccount: string;
+
+  // PDF URL
+  pdfUrl?: string;
+}
