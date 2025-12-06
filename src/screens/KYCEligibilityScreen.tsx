@@ -293,13 +293,26 @@ export default function KYCEligibilityScreen({ navigation }: KYCEligibilityScree
       navigation.navigate('Payment');
     } catch (error: any) {
       console.error('❌ Error saving KYC data:', error);
+      console.error('❌ Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        statusText: error.response?.statusText
+      });
 
       const errorMessage = error.response?.data?.message || 'Failed to save KYC information. Please try again.';
+      const errorDetails = error.response?.data?.error;
+
+      // Enhanced error message with details
+      let fullErrorMessage = errorMessage;
+      if (errorDetails && process.env.NODE_ENV === 'development') {
+        fullErrorMessage += `\n\nDebug Info:\nCode: ${errorDetails.code || 'N/A'}\nDetail: ${errorDetails.detail || 'N/A'}`;
+      }
 
       if (Platform.OS === 'web') {
-        window.alert(`Error: ${errorMessage}`);
+        window.alert(`Error: ${fullErrorMessage}`);
       } else {
-        Alert.alert('Error', errorMessage);
+        Alert.alert('Error', fullErrorMessage);
       }
     } finally {
       setIsProcessing(false);
