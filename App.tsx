@@ -19,58 +19,8 @@ import BookingConfirmationScreen from './src/screens/BookingConfirmationScreen';
 
 const Stack = createStackNavigator();
 
-function AuthStack() {
-  return (
-    <Stack.Navigator>
-      <Stack.Screen
-        name="Login"
-        component={LoginScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="Register"
-        component={RegisterScreen}
-        options={{
-          title: 'Create Account',
-        }}
-      />
-    </Stack.Navigator>
-  );
-}
-
-function MainStack() {
-  return (
-    <Stack.Navigator
-      screenOptions={{
-        headerStyle: { backgroundColor: '#007AFF' },
-        headerTintColor: '#fff',
-        headerTitleStyle: { fontWeight: 'bold' },
-      }}
-    >
-      <Stack.Screen
-        name="VehicleList"
-        component={VehicleListScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="Booking"
-        component={BookingScreen}
-        options={{ title: 'Book Vehicle' }}
-      />
-      <Stack.Screen
-        name="BookingConfirmation"
-        component={BookingConfirmationScreen}
-        options={{
-          title: 'Booking Confirmed',
-          headerLeft: () => null,
-        }}
-      />
-    </Stack.Navigator>
-  );
-}
-
 function Navigation() {
-  const { user, isLoading } = useAuth();
+  const { isLoading } = useAuth();
 
   if (isLoading) {
     return (
@@ -82,7 +32,52 @@ function Navigation() {
 
   return (
     <NavigationContainer>
-      {user ? <MainStack /> : <AuthStack />}
+      <Stack.Navigator
+        screenOptions={{
+          headerStyle: { backgroundColor: '#007AFF' },
+          headerTintColor: '#fff',
+          headerTitleStyle: { fontWeight: 'bold' },
+        }}
+      >
+        {/* Public screens - accessible to everyone */}
+        <Stack.Screen
+          name="VehicleList"
+          component={VehicleListScreen}
+          options={{ headerShown: false }}
+        />
+
+        {/* Authentication screens */}
+        <Stack.Screen
+          name="Login"
+          component={LoginScreen}
+          options={{
+            title: 'Login',
+            headerShown: true
+          }}
+        />
+        <Stack.Screen
+          name="Register"
+          component={RegisterScreen}
+          options={{
+            title: 'Create Account',
+          }}
+        />
+
+        {/* Protected screens - require authentication check */}
+        <Stack.Screen
+          name="Booking"
+          component={BookingScreen}
+          options={{ title: 'Book Vehicle' }}
+        />
+        <Stack.Screen
+          name="BookingConfirmation"
+          component={BookingConfirmationScreen}
+          options={{
+            title: 'Booking Confirmed',
+            headerLeft: () => null,
+          }}
+        />
+      </Stack.Navigator>
     </NavigationContainer>
   );
 }

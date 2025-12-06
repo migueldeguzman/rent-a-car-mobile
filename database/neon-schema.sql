@@ -42,6 +42,9 @@ CREATE TABLE customers (
     license_issued_at VARCHAR(100),
     license_issue_date DATE,
     license_expiry_date DATE,
+    drivers_id VARCHAR(100), -- Driver License ID/Number (for all customers)
+    emirates_id VARCHAR(100), -- Emirates ID (only for UAE residents, NULL for tourists)
+    is_tourist BOOLEAN DEFAULT FALSE, -- TRUE if tourist (passport holder), FALSE if UAE resident
     company_name VARCHAR(255),
     address TEXT,
     city VARCHAR(100),
@@ -419,6 +422,9 @@ CREATE TABLE activity_log (
 CREATE INDEX idx_customers_email ON customers(email);
 CREATE INDEX idx_customers_mobile ON customers(mobile_number);
 CREATE INDEX idx_customers_id_number ON customers(id_number);
+CREATE INDEX idx_customers_drivers_id ON customers(drivers_id);
+CREATE INDEX idx_customers_emirates_id ON customers(emirates_id);
+CREATE INDEX idx_customers_is_tourist ON customers(is_tourist);
 
 -- Vehicles
 CREATE INDEX idx_vehicles_plate_number ON vehicles(plate_number);

@@ -52,7 +52,49 @@ export default function VehicleListScreen({ navigation }: VehicleListScreenProps
   };
 
   const handleVehiclePress = (vehicle: Vehicle) => {
+    // Check if user is authenticated
+    if (!user) {
+      // Prompt user to login or register
+      if (Platform.OS === 'web') {
+        const loginNow = window.confirm('Please login or create an account to book a vehicle.\n\nWould you like to login now?');
+        if (loginNow) {
+          navigation.navigate('Login', { returnTo: 'Booking', vehicle });
+        } else {
+          const registerNow = window.confirm('Would you like to create a new account?');
+          if (registerNow) {
+            navigation.navigate('Register', { returnTo: 'Booking', vehicle });
+          }
+        }
+      } else {
+        Alert.alert(
+          'Login Required',
+          'Please login or create an account to book a vehicle.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Login',
+              onPress: () => navigation.navigate('Login', { returnTo: 'Booking', vehicle }),
+            },
+            {
+              text: 'Register',
+              onPress: () => navigation.navigate('Register', { returnTo: 'Booking', vehicle }),
+            },
+          ]
+        );
+      }
+      return;
+    }
+
+    // User is authenticated, proceed to booking
     navigation.navigate('Booking', { vehicle });
+  };
+
+  const handleLogin = () => {
+    navigation.navigate('Login');
+  };
+
+  const handleRegister = () => {
+    navigation.navigate('Register');
   };
 
   const handleLogout = async () => {
@@ -133,12 +175,26 @@ export default function VehicleListScreen({ navigation }: VehicleListScreenProps
         <View style={styles.headerTextContainer}>
           <Text style={styles.headerTitle}>Available Vehicles</Text>
           <Text style={styles.headerSubtitle}>
-            Welcome, {user?.firstName}!
+            {user ? `Welcome, ${user.firstName}!` : 'Browse our vehicle fleet'}
           </Text>
         </View>
-        <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
-          <Text style={styles.logoutButtonText}>Logout</Text>
-        </TouchableOpacity>
+
+        {user ? (
+          // Show logout button for authenticated users
+          <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
+            <Text style={styles.logoutButtonText}>Logout</Text>
+          </TouchableOpacity>
+        ) : (
+          // Show login/register buttons for guest users
+          <View style={styles.authButtonsContainer}>
+            <TouchableOpacity onPress={handleLogin} style={styles.loginButton}>
+              <Text style={styles.loginButtonText}>Login</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleRegister} style={styles.registerButton}>
+              <Text style={styles.registerButtonText}>Sign Up</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
 
       {vehicles.length === 0 ? (
@@ -211,6 +267,34 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     marginTop: 4,
+  },
+  authButtonsContainer: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  loginButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  loginButtonText: {
+    color: '#007AFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  registerButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#007AFF',
+    borderRadius: 8,
+  },
+  registerButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
   },
   logoutButton: {
     paddingHorizontal: 16,

@@ -4,7 +4,8 @@
   "description": "Deployment scripts for Vesla Rent-a-Car database",
   "scripts": {
     "deploy": "node deploy-to-neon.js",
-    "test": "node test-workflow.js"
+    "test": "node test-workflow.js",
+    "migrate:identity": "node migrate-customer-identity-fields.js"
   },
   "keywords": [
     "neon",

@@ -15,9 +15,15 @@ import { useAuth } from '../contexts/AuthContext';
 
 interface LoginScreenProps {
   navigation: any;
+  route?: {
+    params?: {
+      returnTo?: string;
+      vehicle?: any;
+    };
+  };
 }
 
-export default function LoginScreen({ navigation }: LoginScreenProps) {
+export default function LoginScreen({ navigation, route }: LoginScreenProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -36,7 +42,18 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
     setIsLoading(true);
     try {
       await login(email, password);
-      // Navigation will be handled by App.tsx based on auth state
+
+      // After successful login, navigate to the intended destination
+      const returnTo = route?.params?.returnTo;
+      const vehicle = route?.params?.vehicle;
+
+      if (returnTo === 'Booking' && vehicle) {
+        // User was trying to book a vehicle, take them there
+        navigation.replace('Booking', { vehicle });
+      } else {
+        // Default: go to vehicle list
+        navigation.replace('VehicleList');
+      }
     } catch (error: any) {
       const errorMessage = error.message || 'Invalid credentials. Please try again.';
       setError(errorMessage);
@@ -48,143 +65,218 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
-      keyboardVerticalOffset={0}
-    >
+    <View style={styles.container}>
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
-        scrollEnabled={true}
-        showsVerticalScrollIndicator={true}
+        showsVerticalScrollIndicator={Platform.OS !== 'web'}
       >
         <View style={styles.content}>
-          <Text style={styles.title}>Vesla Rent-a-Car</Text>
-          <Text style={styles.subtitle}>Welcome back!</Text>
+          <View style={styles.card}>
+            <View style={styles.header}>
+              <Text style={styles.title}>Welcome Back</Text>
+              <Text style={styles.subtitle}>Login to your account</Text>
+            </View>
 
-          <View style={styles.form}>
-            {error ? (
-              <View style={styles.errorContainer}>
-                <Text style={styles.errorText}>{error}</Text>
+            <View style={styles.form}>
+              {error ? (
+                <View style={styles.errorContainer}>
+                  <Text style={styles.errorText}>{error}</Text>
+                </View>
+              ) : null}
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Email</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter your email"
+                  placeholderTextColor="#999"
+                  value={email}
+                  onChangeText={setEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  editable={!isLoading}
+                />
               </View>
-            ) : null}
 
-            <TextInput
-              style={styles.input}
-              placeholder="Email"
-              placeholderTextColor="#999"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoCapitalize="none"
-              editable={!isLoading}
-            />
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Password</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter your password"
+                  placeholderTextColor="#999"
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry
+                  editable={!isLoading}
+                />
+              </View>
 
-            <TextInput
-              style={styles.input}
-              placeholder="Password"
-              placeholderTextColor="#999"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              editable={!isLoading}
-            />
+              <TouchableOpacity
+                style={[styles.button, isLoading && styles.buttonDisabled]}
+                onPress={handleLogin}
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.buttonText}>Login</Text>
+                )}
+              </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[styles.button, isLoading && styles.buttonDisabled]}
-              onPress={handleLogin}
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.buttonText}>Login</Text>
-              )}
-            </TouchableOpacity>
+              <View style={styles.divider}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerText}>or</Text>
+                <View style={styles.dividerLine} />
+              </View>
 
-            <TouchableOpacity
-              onPress={() => navigation.navigate('Register')}
-              disabled={isLoading}
-            >
-              <Text style={styles.linkText}>
-                Don't have an account? <Text style={styles.linkTextBold}>Register</Text>
-              </Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.registerButton}
+                onPress={() => navigation.navigate('Register')}
+                disabled={isLoading}
+              >
+                <Text style={styles.registerButtonText}>Create New Account</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.backButton}
+                onPress={() => navigation.goBack()}
+                disabled={isLoading}
+              >
+                <Text style={styles.backButtonText}>← Back to Vehicles</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </ScrollView>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#f8f9fa',
   },
   scrollContent: {
     flexGrow: 1,
-    minHeight: Platform.OS === 'web' ? '100vh' : '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 40,
+    paddingHorizontal: 20,
+    minHeight: Platform.OS === 'web' ? '100vh' : undefined,
   },
   content: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 30,
-    paddingVertical: 40,
-    minHeight: Platform.OS === 'web' ? '100vh' : '100%',
+    width: '100%',
+    maxWidth: 480,
+    alignItems: 'center',
+  },
+  card: {
+    width: '100%',
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 32,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  header: {
+    marginBottom: 32,
   },
   title: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#1a1a1a',
     marginBottom: 8,
     textAlign: 'center',
   },
   subtitle: {
-    fontSize: 18,
+    fontSize: 15,
     color: '#666',
-    marginBottom: 40,
     textAlign: 'center',
   },
   form: {
     width: '100%',
   },
+  inputGroup: {
+    marginBottom: 20,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
   input: {
-    backgroundColor: '#fff',
+    backgroundColor: '#f8f9fa',
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
+    borderColor: '#e0e0e0',
+    borderRadius: 10,
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 14,
     fontSize: 16,
-    marginBottom: 16,
     color: '#333',
   },
   button: {
     backgroundColor: '#007AFF',
-    borderRadius: 8,
-    paddingVertical: 14,
+    borderRadius: 10,
+    paddingVertical: 16,
     alignItems: 'center',
     marginTop: 8,
-    marginBottom: 16,
+    shadowColor: '#007AFF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   buttonDisabled: {
     opacity: 0.6,
   },
   buttonText: {
     color: '#fff',
+    fontSize: 17,
+    fontWeight: '700',
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 24,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#e0e0e0',
+  },
+  dividerText: {
+    marginHorizontal: 16,
+    fontSize: 14,
+    color: '#999',
+    fontWeight: '500',
+  },
+  registerButton: {
+    backgroundColor: '#f8f9fa',
+    borderWidth: 2,
+    borderColor: '#007AFF',
+    borderRadius: 10,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  registerButtonText: {
+    color: '#007AFF',
     fontSize: 16,
     fontWeight: '600',
   },
-  linkText: {
-    textAlign: 'center',
-    color: '#666',
-    fontSize: 14,
+  backButton: {
+    paddingVertical: 12,
+    alignItems: 'center',
   },
-  linkTextBold: {
-    color: '#007AFF',
-    fontWeight: '600',
+  backButtonText: {
+    color: '#666',
+    fontSize: 15,
+    fontWeight: '500',
   },
   errorContainer: {
     backgroundColor: '#fee',
@@ -192,7 +284,7 @@ const styles = StyleSheet.create({
     borderColor: '#fcc',
     borderRadius: 8,
     padding: 12,
-    marginBottom: 16,
+    marginBottom: 20,
   },
   errorText: {
     color: '#c00',

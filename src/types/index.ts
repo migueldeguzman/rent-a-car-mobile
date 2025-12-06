@@ -1,9 +1,52 @@
+/**
+ * Customer interface (also serves as User for authentication)
+ * In this system, users ARE customers - the customers table contains both
+ * customer information and authentication credentials (password_hash, role)
+ */
+export interface Customer {
+  id: string;
+  firstName: string;
+  lastName: string;
+  nationality: string;
+  idType: 'PASSPORT' | 'EMIRATES_ID';
+  idNumber: string;
+  idIssuedAt?: string | null;
+  idExpiryDate?: string | null;
+  licenseNumber: string;
+  licenseIssuedAt?: string | null;
+  licenseIssueDate?: string | null;
+  licenseExpiryDate?: string | null;
+  driversId?: string | null; // Driver License ID/Number (for all customers)
+  emiratesId?: string | null; // Emirates ID Number (only for UAE residents, NULL for tourists)
+  isTourist?: boolean; // TRUE if tourist (passport holder), FALSE if UAE resident
+  companyName?: string | null;
+  address?: string | null;
+  city?: string | null;
+  mobileNumber: string;
+  landlineNumber?: string | null;
+  email: string;
+  passwordHash?: string; // Only used server-side, never sent to client
+  role?: string;
+  isActive?: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/**
+ * User interface (lightweight version for authentication state)
+ * This is what the frontend uses after login - a subset of Customer fields
+ */
 export interface User {
   id: string;
   email: string;
   firstName: string;
   lastName: string;
   role: string;
+  driversId?: string | null;
+  emiratesId?: string | null;
+  isTourist?: boolean;
+  nationality?: string;
+  mobileNumber?: string;
 }
 
 export interface AuthResponse {
