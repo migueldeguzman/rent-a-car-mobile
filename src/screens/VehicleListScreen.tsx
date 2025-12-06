@@ -52,49 +52,9 @@ export default function VehicleListScreen({ navigation }: VehicleListScreenProps
   };
 
   const handleVehiclePress = (vehicle: Vehicle) => {
-    // Check if user is authenticated
-    if (!user) {
-      // Prompt user to login or register
-      if (Platform.OS === 'web') {
-        const loginNow = window.confirm('Please login or create an account to book a vehicle.\n\nWould you like to login now?');
-        if (loginNow) {
-          navigation.navigate('Login', { returnTo: 'Booking', vehicle });
-        } else {
-          const registerNow = window.confirm('Would you like to create a new account?');
-          if (registerNow) {
-            navigation.navigate('Register', { returnTo: 'Booking', vehicle });
-          }
-        }
-      } else {
-        Alert.alert(
-          'Login Required',
-          'Please login or create an account to book a vehicle.',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            {
-              text: 'Login',
-              onPress: () => navigation.navigate('Login', { returnTo: 'Booking', vehicle }),
-            },
-            {
-              text: 'Register',
-              onPress: () => navigation.navigate('Register', { returnTo: 'Booking', vehicle }),
-            },
-          ]
-        );
-      }
-      return;
-    }
-
-    // User is authenticated, proceed to booking
+    // Allow guest browsing - proceed to booking screen without authentication
+    // Authentication will be required at Step 2 (KYC) when user tries to confirm booking
     navigation.navigate('Booking', { vehicle });
-  };
-
-  const handleLogin = () => {
-    navigation.navigate('Login');
-  };
-
-  const handleRegister = () => {
-    navigation.navigate('Register');
   };
 
   const handleLogout = async () => {
@@ -179,21 +139,11 @@ export default function VehicleListScreen({ navigation }: VehicleListScreenProps
           </Text>
         </View>
 
-        {user ? (
-          // Show logout button for authenticated users
+        {user && (
+          // Show logout button for authenticated customers
           <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
             <Text style={styles.logoutButtonText}>Logout</Text>
           </TouchableOpacity>
-        ) : (
-          // Show login/register buttons for guest users
-          <View style={styles.authButtonsContainer}>
-            <TouchableOpacity onPress={handleLogin} style={styles.loginButton}>
-              <Text style={styles.loginButtonText}>Login</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={handleRegister} style={styles.registerButton}>
-              <Text style={styles.registerButtonText}>Sign Up</Text>
-            </TouchableOpacity>
-          </View>
         )}
       </View>
 

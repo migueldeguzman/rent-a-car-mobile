@@ -1,3 +1,11 @@
+/**
+ * AuthContext - Customer-based Authentication
+ *
+ * IMPORTANT: This app uses a single customers table for authentication.
+ * There is NO separate users table. When a customer registers/logs in,
+ * the backend queries the customers table (which contains email, password_hash, role).
+ * The backend returns a lightweight User object (subset of Customer fields) + JWT token.
+ */
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
@@ -84,11 +92,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  /**
+   * Login - Authenticates customer via customers table
+   * Backend validates email/password_hash from customers table
+   * Returns lightweight User object (subset of customer data) + JWT token
+   */
   const login = async (email: string, password: string) => {
     try {
-      console.log('📧 Attempting login for:', email);
+      console.log('📧 Attempting login for customer:', email);
       const response = await authAPI.login(email, password);
-      console.log('✅ Login response:', response);
+      console.log('✅ Login response from customers table:', response);
       const { user: userData, token: authToken } = response.data;
 
       // Save to state
@@ -100,7 +113,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         ['authToken', authToken],
         ['user', JSON.stringify(userData)],
       ]);
-      console.log('✅ Login successful, user saved');
+      console.log('✅ Customer authenticated successfully');
     } catch (error: any) {
       console.error('❌ Login error details:', {
         message: error.message,
@@ -112,6 +125,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  /**
+   * Register - Creates new customer record in customers table
+   * Backend inserts into customers table with password_hash
+   * Returns lightweight User object + JWT token for immediate login
+   *
+   * NOTE: This basic registration is NOT used in the booking flow.
+   * The booking flow uses registerWithKYC (in customerAPI) which creates
+   * a customer with full KYC data in one step.
+   */
   const register = async (
     email: string,
     password: string,
@@ -119,6 +141,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     lastName: string
   ) => {
     try {
+      console.log('📝 Registering new customer in customers table...');
       const response = await authAPI.register(email, password, firstName, lastName);
       const { user: userData, token: authToken } = response.data;
 
@@ -131,6 +154,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         ['authToken', authToken],
         ['user', JSON.stringify(userData)],
       ]);
+      console.log('✅ Customer registered successfully in customers table');
     } catch (error: any) {
       throw new Error(error.response?.data?.message || 'Registration failed');
     }

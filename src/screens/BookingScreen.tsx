@@ -260,7 +260,7 @@ export default function BookingScreen({ navigation, route }: BookingScreenProps)
       return;
     }
 
-    console.log('✅ All validations passed, proceeding to KYC');
+    console.log('✅ All validations passed, checking authentication...');
 
     setIsLoading(true);
     try {
@@ -282,7 +282,7 @@ export default function BookingScreen({ navigation, route }: BookingScreenProps)
 
       console.log('✅ Vehicle selection saved to context');
 
-      // Move to Step 2: KYC/Eligibility
+      // Move to Step 2: KYC/Eligibility (which will handle account creation)
       nextStep();
       navigation.navigate('KYCEligibility');
     } catch (error: any) {

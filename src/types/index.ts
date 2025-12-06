@@ -34,25 +34,33 @@ export interface Customer {
 /**
  * User interface (lightweight version for authentication state)
  * This is what the frontend uses after login - a subset of Customer fields
+ *
+ * IMPORTANT: There is NO separate users table in the database.
+ * This interface represents the auth state derived from the customers table.
+ * Backend returns this lightweight object after login to minimize data transfer.
  */
 export interface User {
-  id: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  role: string;
-  licenseNumber?: string | null;
-  emiratesId?: string | null;
-  isTourist?: boolean;
-  nationality?: string;
-  mobileNumber?: string;
+  id: string;           // customers.id
+  email: string;        // customers.email
+  firstName: string;    // customers.first_name
+  lastName: string;     // customers.last_name
+  role: string;         // customers.role
+  licenseNumber?: string | null;    // customers.license_number
+  emiratesId?: string | null;       // customers.emirates_id
+  isTourist?: boolean;              // customers.is_tourist
+  nationality?: string;             // customers.nationality
+  mobileNumber?: string;            // customers.mobile_number
 }
 
+/**
+ * AuthResponse from backend after login/register
+ * Backend queries customers table and returns lightweight User object + JWT token
+ */
 export interface AuthResponse {
   status: string;
   data: {
-    user: User;
-    token: string;
+    user: User;    // Derived from customers table (lightweight subset)
+    token: string; // JWT token for authentication
   };
 }
 

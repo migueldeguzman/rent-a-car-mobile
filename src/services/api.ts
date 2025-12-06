@@ -60,13 +60,37 @@ api.interceptors.response.use(
   }
 );
 
-// Auth APIs
+/**
+ * Auth APIs - Customer-based Authentication
+ *
+ * IMPORTANT: These endpoints interact with the customers table ONLY.
+ * There is NO separate users table in the database.
+ *
+ * Backend flow:
+ * - /auth/login: SELECT FROM customers WHERE email = ? AND password_hash = bcrypt.hash(?)
+ * - /auth/register: INSERT INTO customers (email, password_hash, first_name, last_name, role, ...)
+ *
+ * Both endpoints return a lightweight User object (subset of customer fields) + JWT token
+ */
 export const authAPI = {
+  /**
+   * Login - Authenticates customer via customers table
+   * Backend queries: SELECT id, email, first_name, ... FROM customers WHERE email = ? AND password_hash = ?
+   * Returns: { user: User, token: string }
+   */
   login: async (email: string, password: string): Promise<AuthResponse> => {
     const response = await api.post<AuthResponse>('/auth/login', { email, password });
     return response.data;
   },
 
+  /**
+   * Register - Creates basic customer record in customers table
+   * Backend query: INSERT INTO customers (email, password_hash, first_name, last_name, role) VALUES (...)
+   * Returns: { user: User, token: string }
+   *
+   * NOTE: This is for simple registration. The booking flow uses customerAPI.registerWithKYC
+   * which creates a customer with full KYC data in one step.
+   */
   register: async (
     email: string,
     password: string,
@@ -111,16 +135,32 @@ export const vehicleAPI = {
   },
 };
 
-// Customer APIs
+/**
+ * Customer APIs - Direct customers table operations
+ *
+ * IMPORTANT: All operations work with the customers table.
+ * The customers table contains BOTH auth fields (email, password_hash, role)
+ * AND business fields (phone, license, emirates_id, etc.)
+ */
 export const customerAPI = {
-  // Register customer with complete KYC data (creates account + KYC in one step)
+  /**
+   * Register customer with complete KYC data (used in booking flow at Step 2)
+   *
+   * Backend query: INSERT INTO customers (
+   *   email, password_hash, first_name, last_name, role,  // Auth fields
+   *   mobile_number, license_number, emirates_id, passport_number, nationality, is_tourist  // KYC fields
+   * ) VALUES (...)
+   *
+   * This creates ONE record in customers table with all auth + KYC data.
+   * Returns: { success: true, data: { customerId: string } }
+   */
   registerWithKYC: async (data: {
-    // Account credentials
+    // Account credentials (auth fields in customers table)
     email: string;
     password: string;
     firstName: string;
     lastName: string;
-    // KYC identity data
+    // KYC identity data (business fields in customers table)
     phoneNumber: string;
     emiratesId?: string | null;
     passportNumber?: string | null;

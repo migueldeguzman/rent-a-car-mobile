@@ -218,16 +218,19 @@ export default function KYCEligibilityScreen({ navigation }: KYCEligibilityScree
     setIsProcessing(true);
 
     try {
-      console.log('📝 Creating customer account with KYC data...');
+      console.log('📝 Step 2: Creating customer record in customers table with full KYC data...');
 
-      // Step 1: Register user account with KYC data via new endpoint
+      // Step 1: Register customer with KYC data
+      // This creates a single record in the customers table with:
+      // - Auth fields: email, password_hash, role
+      // - KYC fields: phone, emirates_id/passport, license, nationality, etc.
       const registerResponse = await customerAPI.registerWithKYC({
-        // Account credentials
+        // Account credentials (stored in customers table)
         email,
         password,
         firstName,
         lastName,
-        // KYC identity data
+        // KYC identity data (stored in same customers table)
         phoneNumber,
         emiratesId: isTourist ? null : emiratesId,
         passportNumber: isTourist ? passportNumber : null,
@@ -240,12 +243,13 @@ export default function KYCEligibilityScreen({ navigation }: KYCEligibilityScree
         isTourist,
       });
 
-      console.log('✅ Customer account created successfully');
+      console.log('✅ Customer record created in customers table (includes auth + KYC data)');
 
-      // Step 2: Auto-login the user with new credentials
+      // Step 2: Auto-login the customer with new credentials
+      // Backend validates against customers table and returns User object + JWT
       await login(email, password);
 
-      console.log('✅ User auto-logged in');
+      console.log('✅ Customer auto-logged in (authenticated via customers table)');
 
       // Step 3: Save KYC data to flow context for reference
       const kycData: KYCData = {
