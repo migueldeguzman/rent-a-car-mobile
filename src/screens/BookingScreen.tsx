@@ -35,13 +35,15 @@ const DEFAULT_ADDONS: AddOn[] = [
   { id: 'insurance-upgrade', name: 'Premium Insurance', description: 'Zero deductible comprehensive coverage', dailyRate: 75, totalAmount: 0, selected: false },
 ];
 
+type RentalPeriodOption = '1_MONTH' | '3_MONTHS' | '6_MONTHS' | 'CUSTOM';
+
 export default function BookingScreen({ navigation, route }: BookingScreenProps) {
   const { vehicle } = route.params;
   const [startDate, setStartDate] = useState(new Date());
-  const [endDate, setEndDate] = useState(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)); // +7 days
+  const [endDate, setEndDate] = useState(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)); // Default to 1 month
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
-  const [rentalMode, setRentalMode] = useState<'DAILY' | 'WEEKLY' | 'MONTHLY'>('WEEKLY'); // Default to popular option
+  const [selectedPeriod, setSelectedPeriod] = useState<RentalPeriodOption>('1_MONTH'); // Default to 1 month
   const [isLoading, setIsLoading] = useState(false);
 
 
@@ -57,63 +59,82 @@ export default function BookingScreen({ navigation, route }: BookingScreenProps)
     whatsapp: false,
   });
 
-  // Calculate rates based on selected mode
-  const calculateModeBasedRate = (): { totalAmount: number; breakdown: string; totalDays: number; savings: number } => {
+  // Monthly discount tiers
+  const getMonthlyRateForPeriod = (months: number): number => {
+    const baseMonthlyRate = typeof vehicle.monthlyRate === 'string' ? parseFloat(vehicle.monthlyRate) : vehicle.monthlyRate;
+
+    if (months >= 6) {
+      return baseMonthlyRate - 100; // 6+ months: 100 AED cheaper per month
+    } else if (months >= 3) {
+      return baseMonthlyRate - 50; // 3-5 months: 50 AED cheaper per month
+    } else {
+      return baseMonthlyRate; // 1-2 months: base rate
+    }
+  };
+
+  // Handle period selection changes
+  const handlePeriodChange = (period: RentalPeriodOption) => {
+    setSelectedPeriod(period);
+    const today = new Date();
+
+    if (period === '1_MONTH') {
+      setEndDate(new Date(today.getTime() + 30 * 24 * 60 * 60 * 1000));
+    } else if (period === '3_MONTHS') {
+      setEndDate(new Date(today.getTime() + 90 * 24 * 60 * 60 * 1000));
+    } else if (period === '6_MONTHS') {
+      setEndDate(new Date(today.getTime() + 180 * 24 * 60 * 60 * 1000));
+    }
+    // For CUSTOM, don't change the end date - let user pick
+  };
+
+  // Calculate rates based on selected period
+  const calculatePanelBasedRate = (): {
+    totalAmount: number;
+    breakdown: string;
+    totalDays: number;
+    savings: number;
+    monthlyRate: number;
+    months: number;
+  } => {
     const diffTime = endDate.getTime() - startDate.getTime();
     const totalDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
     if (totalDays <= 0) {
-      return { totalAmount: 0, breakdown: 'Invalid date range', totalDays: 0, savings: 0 };
+      return { totalAmount: 0, breakdown: 'Invalid date range', totalDays: 0, savings: 0, monthlyRate: 0, months: 0 };
     }
 
     const daily = typeof vehicle.dailyRate === 'string' ? parseFloat(vehicle.dailyRate) : vehicle.dailyRate;
-    const weekly = typeof vehicle.weeklyRate === 'string' ? parseFloat(vehicle.weeklyRate) : vehicle.weeklyRate;
-    const monthly = typeof vehicle.monthlyRate === 'string' ? parseFloat(vehicle.monthlyRate) : vehicle.monthlyRate;
+    const baseMonthlyRate = typeof vehicle.monthlyRate === 'string' ? parseFloat(vehicle.monthlyRate) : vehicle.monthlyRate;
+
+    const months = Math.floor(totalDays / 30);
+    const remainingDays = totalDays % 30;
+
+    const applicableMonthlyRate = getMonthlyRateForPeriod(months);
 
     let totalAmount: number;
     let breakdown: string;
     let savings = 0;
-    const dailyTotal = totalDays * daily;
 
-    if (rentalMode === 'DAILY') {
-      totalAmount = dailyTotal;
+    if (months > 0) {
+      totalAmount = (months * applicableMonthlyRate) + (remainingDays * daily);
+      breakdown = `${months} month${months > 1 ? 's' : ''} × ${financialFormatting.formatCurrency(applicableMonthlyRate)}`;
+      if (remainingDays > 0) {
+        breakdown += ` + ${remainingDays} day${remainingDays > 1 ? 's' : ''} × ${financialFormatting.formatCurrency(daily)}`;
+      }
+
+      // Calculate savings compared to base rate
+      const baseTotal = (months * baseMonthlyRate) + (remainingDays * daily);
+      savings = baseTotal - totalAmount;
+    } else {
+      // Less than a month - use daily rate
+      totalAmount = totalDays * daily;
       breakdown = `${totalDays} day${totalDays > 1 ? 's' : ''} × ${financialFormatting.formatCurrency(daily)}/day`;
-    } else if (rentalMode === 'WEEKLY') {
-      const weeks = Math.floor(totalDays / 7);
-      const remainingDays = totalDays % 7;
-
-      if (weeks > 0) {
-        totalAmount = (weeks * weekly) + (remainingDays * daily);
-        breakdown = `${weeks} week${weeks > 1 ? 's' : ''} × ${financialFormatting.formatCurrency(weekly)}`;
-        if (remainingDays > 0) {
-          breakdown += ` + ${remainingDays} day${remainingDays > 1 ? 's' : ''} × ${financialFormatting.formatCurrency(daily)}`;
-        }
-        savings = dailyTotal - totalAmount;
-      } else {
-        totalAmount = dailyTotal;
-        breakdown = `${totalDays} day${totalDays > 1 ? 's' : ''} × ${financialFormatting.formatCurrency(daily)}/day`;
-      }
-    } else { // MONTHLY
-      const months = Math.floor(totalDays / 30);
-      const remainingDays = totalDays % 30;
-
-      if (months > 0) {
-        totalAmount = (months * monthly) + (remainingDays * daily);
-        breakdown = `${months} month${months > 1 ? 's' : ''} × ${financialFormatting.formatCurrency(monthly)}`;
-        if (remainingDays > 0) {
-          breakdown += ` + ${remainingDays} day${remainingDays > 1 ? 's' : ''} × ${financialFormatting.formatCurrency(daily)}`;
-        }
-        savings = dailyTotal - totalAmount;
-      } else {
-        totalAmount = dailyTotal;
-        breakdown = `${totalDays} day${totalDays > 1 ? 's' : ''} × ${financialFormatting.formatCurrency(daily)}/day`;
-      }
     }
 
-    return { totalAmount, breakdown, totalDays, savings };
+    return { totalAmount, breakdown, totalDays, savings, monthlyRate: applicableMonthlyRate, months };
   };
 
-  const rateCalculation = calculateModeBasedRate();
+  const rateCalculation = calculatePanelBasedRate();
 
   // Calculate add-ons total
   const calculateAddOnsTotal = (): number => {
@@ -170,40 +191,10 @@ export default function BookingScreen({ navigation, route }: BookingScreenProps)
   const validateMinimumPeriod = (): boolean => {
     const days = rateCalculation.totalDays;
 
-    if (rentalMode === 'DAILY' && days < 1) {
-      Alert.alert('Minimum Period', 'Daily rental requires at least 1 day');
-      return false;
-    }
-    if (rentalMode === 'WEEKLY' && days < 7) {
-      Alert.alert(
-        'Minimum Period',
-        `Weekly rental requires at least 7 days. You selected ${days} days. Would you like to adjust to 7 days?`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Adjust to 7 days',
-            onPress: () => {
-              setEndDate(new Date(startDate.getTime() + 7 * 24 * 60 * 60 * 1000));
-            },
-          },
-        ]
-      );
-      return false;
-    }
-    if (rentalMode === 'MONTHLY' && days < 30) {
-      Alert.alert(
-        'Minimum Period',
-        `Monthly rental requires at least 30 days. You selected ${days} days. Would you like to adjust to 30 days?`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Adjust to 30 days',
-            onPress: () => {
-              setEndDate(new Date(startDate.getTime() + 30 * 24 * 60 * 60 * 1000));
-            },
-          },
-        ]
-      );
+    // For preset periods, validation is built-in
+    // For custom period, ensure minimum 1 day
+    if (selectedPeriod === 'CUSTOM' && days < 1) {
+      Alert.alert('Minimum Period', 'Rental requires at least 1 day');
       return false;
     }
 
@@ -270,9 +261,13 @@ export default function BookingScreen({ navigation, route }: BookingScreenProps)
       ? `\n\nAdd-ons:\n${selectedAddOns.map(a => `• ${a.name}: ${financialFormatting.formatCurrency(a.dailyRate)}/day`).join('\n')}`
       : '';
 
+    const periodLabel = selectedPeriod === '1_MONTH' ? '1 Month' :
+                        selectedPeriod === '3_MONTHS' ? '3 Months' :
+                        selectedPeriod === '6_MONTHS' ? '6 Months' : 'Custom Period';
+
     const confirmMessage =
       `Book ${vehicle.make} ${vehicle.model} for ${rateCalculation.totalDays} days?\n\n` +
-      `Rental Mode: ${rentalMode}\n` +
+      `Rental Period: ${periodLabel}\n` +
       `Subtotal: ${financialFormatting.formatCurrency(priceBreakdown.subtotal)}\n` +
       `Add-ons: ${financialFormatting.formatCurrency(priceBreakdown.addOnsTotal || 0)}${addOnsText}\n` +
       `VAT (5%): ${financialFormatting.formatCurrency(priceBreakdown.vatAmount)}\n` +
@@ -302,7 +297,8 @@ export default function BookingScreen({ navigation, route }: BookingScreenProps)
                 vehicleId: vehicle.id,
                 startDate: startDate.toISOString(),
                 endDate: endDate.toISOString(),
-                notes: `Booking for ${vehicle.make} ${vehicle.model} - ${rentalMode} rate\n` +
+                notes: `Booking for ${vehicle.make} ${vehicle.model} - ${periodLabel}\n` +
+                       `Monthly Rate: ${financialFormatting.formatCurrency(rateCalculation.monthlyRate)}/month\n` +
                        `Payment Method: ${paymentMethod}\n` +
                        `Add-ons: ${selectedAddOns.map(a => a.name).join(', ') || 'None'}\n` +
                        `Total with VAT: ${financialFormatting.formatCurrency(priceBreakdown.totalWithVat)}`,
@@ -375,68 +371,123 @@ export default function BookingScreen({ navigation, route }: BookingScreenProps)
           )}
         </View>
 
-        {/* Rental Mode Selection with Visual Hierarchy */}
+        {/* Rental Period Selection - Panel-Based UI */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Select Rental Mode</Text>
-          <View style={styles.modeContainer}>
+          <Text style={styles.sectionTitle}>Select Rental Period</Text>
+          <Text style={styles.sectionSubtitle}>Save more with longer rentals!</Text>
+
+          <View style={styles.periodGrid}>
+            {/* 1 Month Panel */}
             <TouchableOpacity
-              style={[styles.modeButton, rentalMode === 'DAILY' && styles.modeButtonActive]}
-              onPress={() => setRentalMode('DAILY')}
+              style={[styles.periodPanel, selectedPeriod === '1_MONTH' && styles.periodPanelActive]}
+              onPress={() => handlePeriodChange('1_MONTH')}
             >
-              <Text style={[styles.modeButtonText, rentalMode === 'DAILY' && styles.modeButtonTextActive]}>
-                Daily
+              <Text style={[styles.periodTitle, selectedPeriod === '1_MONTH' && styles.periodTitleActive]}>
+                1 Month
               </Text>
-              <Text style={styles.modeRate}>{financialFormatting.formatCurrency(vehicle.dailyRate)}/day</Text>
+              <Text style={[styles.periodRate, selectedPeriod === '1_MONTH' && styles.periodRateActive]}>
+                {financialFormatting.formatCurrency(getMonthlyRateForPeriod(1))}
+              </Text>
+              <Text style={styles.periodLabel}>per month</Text>
+              <Text style={styles.periodNote}>Base rate</Text>
             </TouchableOpacity>
 
+            {/* 3 Months Panel - Popular */}
             <TouchableOpacity
-              style={[styles.modeButton, styles.popularMode, rentalMode === 'WEEKLY' && styles.modeButtonActive]}
-              onPress={() => setRentalMode('WEEKLY')}
+              style={[
+                styles.periodPanel,
+                styles.popularPeriod,
+                selectedPeriod === '3_MONTHS' && styles.periodPanelActive
+              ]}
+              onPress={() => handlePeriodChange('3_MONTHS')}
             >
               <View style={styles.popularBadge}>
                 <Text style={styles.popularBadgeText}>POPULAR</Text>
               </View>
-              <Text style={[styles.modeButtonText, rentalMode === 'WEEKLY' && styles.modeButtonTextActive]}>
-                Weekly
+              <Text style={[styles.periodTitle, selectedPeriod === '3_MONTHS' && styles.periodTitleActive]}>
+                3 Months
               </Text>
-              <Text style={styles.modeRate}>{financialFormatting.formatCurrency(vehicle.weeklyRate)}/week</Text>
-              {(() => {
-                const weeklyTotal = 7 * parseFloat(String(vehicle.dailyRate));
-                const weeklySavings = weeklyTotal - parseFloat(String(vehicle.weeklyRate));
-                const weeklyPercent = (weeklySavings / weeklyTotal * 100).toFixed(0);
-                return weeklySavings > 0 ? (
-                  <View style={styles.savingsBadge}>
-                    <Text style={styles.savingsText}>Save {weeklyPercent}%</Text>
-                  </View>
-                ) : null;
-              })()}
+              <Text style={[styles.periodRate, selectedPeriod === '3_MONTHS' && styles.periodRateActive]}>
+                {financialFormatting.formatCurrency(getMonthlyRateForPeriod(3))}
+              </Text>
+              <Text style={styles.periodLabel}>per month</Text>
+              <View style={styles.savingsBadgeInline}>
+                <Text style={styles.savingsTextInline}>Save 50 AED/mo</Text>
+              </View>
             </TouchableOpacity>
 
+            {/* 6 Months Panel - Best Value */}
             <TouchableOpacity
-              style={[styles.modeButton, rentalMode === 'MONTHLY' && styles.modeButtonActive]}
-              onPress={() => setRentalMode('MONTHLY')}
+              style={[
+                styles.periodPanel,
+                styles.bestValuePeriod,
+                selectedPeriod === '6_MONTHS' && styles.periodPanelActive
+              ]}
+              onPress={() => handlePeriodChange('6_MONTHS')}
             >
-              <Text style={[styles.modeButtonText, rentalMode === 'MONTHLY' && styles.modeButtonTextActive]}>
-                Monthly
+              <View style={[styles.popularBadge, styles.bestValueBadge]}>
+                <Text style={styles.popularBadgeText}>BEST VALUE</Text>
+              </View>
+              <Text style={[styles.periodTitle, selectedPeriod === '6_MONTHS' && styles.periodTitleActive]}>
+                6 Months
               </Text>
-              <Text style={styles.modeRate}>{financialFormatting.formatCurrency(vehicle.monthlyRate)}/month</Text>
-              {(() => {
-                const monthlyTotal = 30 * parseFloat(String(vehicle.dailyRate));
-                const monthlySavings = monthlyTotal - parseFloat(String(vehicle.monthlyRate));
-                const monthlyPercent = (monthlySavings / monthlyTotal * 100).toFixed(0);
-                return monthlySavings > 0 ? (
-                  <View style={styles.savingsBadge}>
-                    <Text style={styles.savingsText}>Save {monthlyPercent}%</Text>
-                  </View>
-                ) : null;
-              })()}
+              <Text style={[styles.periodRate, selectedPeriod === '6_MONTHS' && styles.periodRateActive]}>
+                {financialFormatting.formatCurrency(getMonthlyRateForPeriod(6))}
+              </Text>
+              <Text style={styles.periodLabel}>per month</Text>
+              <View style={styles.savingsBadgeInline}>
+                <Text style={styles.savingsTextInline}>Save 100 AED/mo</Text>
+              </View>
             </TouchableOpacity>
+
+            {/* Custom Period Panel */}
+            <TouchableOpacity
+              style={[styles.periodPanel, selectedPeriod === 'CUSTOM' && styles.periodPanelActive]}
+              onPress={() => handlePeriodChange('CUSTOM')}
+            >
+              <Ionicons
+                name="calendar-outline"
+                size={24}
+                color={selectedPeriod === 'CUSTOM' ? colors.primary.main : colors.neutral.text.secondary}
+                style={{ marginBottom: 8 }}
+              />
+              <Text style={[styles.periodTitle, selectedPeriod === 'CUSTOM' && styles.periodTitleActive]}>
+                Custom
+              </Text>
+              <Text style={styles.periodNote}>Pick your dates</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Comparison Summary */}
+          <View style={styles.comparisonBox}>
+            <Text style={styles.comparisonTitle}>💰 Pricing Comparison</Text>
+            <View style={styles.comparisonRow}>
+              <Text style={styles.comparisonLabel}>1 Month:</Text>
+              <Text style={styles.comparisonValue}>
+                {financialFormatting.formatCurrency(getMonthlyRateForPeriod(1))}/mo
+              </Text>
+            </View>
+            <View style={styles.comparisonRow}>
+              <Text style={styles.comparisonLabel}>3 Months:</Text>
+              <Text style={[styles.comparisonValue, styles.comparisonSavings]}>
+                {financialFormatting.formatCurrency(getMonthlyRateForPeriod(3))}/mo
+                <Text style={styles.comparisonSavingsText}> (Save 50 AED/mo)</Text>
+              </Text>
+            </View>
+            <View style={styles.comparisonRow}>
+              <Text style={styles.comparisonLabel}>6 Months:</Text>
+              <Text style={[styles.comparisonValue, styles.comparisonSavings]}>
+                {financialFormatting.formatCurrency(getMonthlyRateForPeriod(6))}/mo
+                <Text style={styles.comparisonSavingsText}> (Save 100 AED/mo)</Text>
+              </Text>
+            </View>
           </View>
         </View>
 
-        {/* Date Selection */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Select Rental Period</Text>
+        {/* Date Selection - Only show for Custom period */}
+        {selectedPeriod === 'CUSTOM' && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Custom Date Range</Text>
 
           <View style={styles.dateContainer}>
             <Text style={styles.dateLabel}>Start Date</Text>
@@ -536,6 +587,7 @@ export default function BookingScreen({ navigation, route }: BookingScreenProps)
             )}
           </View>
         </View>
+        )}
 
         {/* Payment Method Selection */}
         <View style={styles.section}>
@@ -650,8 +702,12 @@ export default function BookingScreen({ navigation, route }: BookingScreenProps)
 
           <View style={styles.priceCard}>
             <View style={styles.priceRow}>
-              <Text style={styles.priceLabel}>Rental Mode:</Text>
-              <Text style={styles.priceValue}>{rentalMode}</Text>
+              <Text style={styles.priceLabel}>Rental Period:</Text>
+              <Text style={styles.priceValue}>
+                {selectedPeriod === '1_MONTH' ? '1 Month' :
+                 selectedPeriod === '3_MONTHS' ? '3 Months' :
+                 selectedPeriod === '6_MONTHS' ? '6 Months' : 'Custom'}
+              </Text>
             </View>
             <View style={styles.priceRow}>
               <Text style={styles.priceLabel}>Total Days:</Text>
@@ -1159,5 +1215,122 @@ const styles = StyleSheet.create({
     color: colors.neutral.white,
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  // New Panel-Based Pricing Styles
+  sectionSubtitle: {
+    fontSize: 14,
+    color: colors.neutral.text.secondary,
+    marginBottom: 16,
+    marginTop: -8,
+  },
+  periodGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginBottom: 16,
+  },
+  periodPanel: {
+    flex: 1,
+    minWidth: '45%',
+    backgroundColor: colors.ui.cardBackground,
+    borderWidth: 2,
+    borderColor: colors.neutral.border,
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    position: 'relative',
+    ...colors.shadows.small,
+  },
+  periodPanelActive: {
+    borderColor: colors.primary.main,
+    backgroundColor: colors.primary.main + '10',
+    ...colors.shadows.medium,
+  },
+  popularPeriod: {
+    borderColor: colors.ui.popularBadge + '80',
+  },
+  bestValuePeriod: {
+    borderColor: colors.ui.savingsBadge + '80',
+  },
+  bestValueBadge: {
+    backgroundColor: colors.ui.savingsBadge,
+  },
+  periodTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.neutral.text.primary,
+    marginBottom: 8,
+  },
+  periodTitleActive: {
+    color: colors.primary.main,
+    fontWeight: '700',
+  },
+  periodRate: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: colors.neutral.text.primary,
+    marginBottom: 4,
+  },
+  periodRateActive: {
+    color: colors.primary.main,
+  },
+  periodLabel: {
+    fontSize: 12,
+    color: colors.neutral.text.secondary,
+    marginBottom: 8,
+  },
+  periodNote: {
+    fontSize: 11,
+    color: colors.neutral.text.hint,
+    fontStyle: 'italic',
+  },
+  savingsBadgeInline: {
+    marginTop: 8,
+    backgroundColor: colors.ui.savingsBadge,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  savingsTextInline: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.neutral.white,
+  },
+  comparisonBox: {
+    backgroundColor: colors.primary.main + '08',
+    borderRadius: 8,
+    padding: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: colors.primary.main,
+  },
+  comparisonTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.neutral.text.primary,
+    marginBottom: 12,
+  },
+  comparisonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 6,
+  },
+  comparisonLabel: {
+    fontSize: 14,
+    color: colors.neutral.text.secondary,
+  },
+  comparisonValue: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: colors.neutral.text.primary,
+  },
+  comparisonSavings: {
+    fontWeight: '600',
+    color: colors.ui.savingsBadge,
+  },
+  comparisonSavingsText: {
+    fontSize: 12,
+    fontWeight: 'normal',
+    color: colors.neutral.text.secondary,
   },
 });
