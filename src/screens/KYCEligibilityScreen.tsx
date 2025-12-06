@@ -60,8 +60,21 @@ export default function KYCEligibilityScreen({ navigation }: KYCEligibilityScree
   const [dateOfBirth, setDateOfBirth] = useState('');
 
   // Payment information
-  const [creditCardNumber, setCreditCardNumber] = useState(''); // Will store last 4 digits only
+  const [creditCardNumber, setCreditCardNumber] = useState(''); // Full card number
   const [creditCardType, setCreditCardType] = useState<'VISA' | 'MASTERCARD' | 'AMEX' | 'OTHER'>('VISA');
+
+  // Get expected card length based on type
+  const getCardLength = (type: string): number => {
+    switch (type) {
+      case 'AMEX':
+        return 15;
+      case 'VISA':
+      case 'MASTERCARD':
+        return 16;
+      default:
+        return 16; // Default to 16
+    }
+  };
   const [cardHolderName, setCardHolderName] = useState('');
   const [bankProvider, setBankProvider] = useState('');
   const [showBankPicker, setShowBankPicker] = useState(false);
@@ -113,8 +126,12 @@ export default function KYCEligibilityScreen({ navigation }: KYCEligibilityScree
       return false;
     }
 
-    if (!creditCardNumber || creditCardNumber.length < 4) {
-      Alert.alert('Validation Error', 'Please enter the last 4 digits of your credit card');
+    const expectedLength = getCardLength(creditCardType);
+    if (!creditCardNumber || creditCardNumber.length !== expectedLength) {
+      Alert.alert(
+        'Validation Error',
+        `Please enter a complete ${creditCardType} card number (${expectedLength} digits)`
+      );
       return false;
     }
 
@@ -137,6 +154,9 @@ export default function KYCEligibilityScreen({ navigation }: KYCEligibilityScree
     setIsProcessing(true);
 
     try {
+      // Extract last 4 digits for storage (PCI compliance)
+      const last4Digits = creditCardNumber.slice(-4);
+
       const kycData: KYCData = {
         verificationType,
         phoneNumber,
@@ -146,7 +166,7 @@ export default function KYCEligibilityScreen({ navigation }: KYCEligibilityScree
         driversId,
         driversLicenseCountry,
         driversLicenseExpiry: driversLicenseExpiry || undefined,
-        creditCardNumber, // Last 4 digits only
+        creditCardNumber: last4Digits, // Store only last 4 digits
         creditCardType,
         cardHolderName,
         bankProvider,
@@ -159,7 +179,7 @@ export default function KYCEligibilityScreen({ navigation }: KYCEligibilityScree
 
       console.log('📝 Saving KYC data to backend...');
 
-      // Save KYC data to backend
+      // Save KYC data to backend (only last 4 digits of card)
       await customerAPI.updateKYC({
         email: user?.email || '', // Get email from authenticated user
         phoneNumber, // Add phone number from form
@@ -172,7 +192,7 @@ export default function KYCEligibilityScreen({ navigation }: KYCEligibilityScree
         nationality,
         dateOfBirth: dateOfBirth || undefined,
         isTourist,
-        creditCardNumber,
+        creditCardNumber: last4Digits, // Only send last 4 digits to backend
         creditCardType,
         cardHolderName,
         bankProvider,
@@ -617,22 +637,24 @@ export default function KYCEligibilityScreen({ navigation }: KYCEligibilityScree
                 </View>
 
                 <View style={styles.inputContainer}>
-                  <Text style={styles.inputLabel}>Last 4 Digits of Card *</Text>
+                  <Text style={styles.inputLabel}>Card Number *</Text>
                   <TextInput
                     style={styles.input}
                     value={creditCardNumber}
                     onChangeText={(text) => {
-                      // Only allow 4 digits
-                      if (text.length <= 4 && /^\d*$/.test(text)) {
-                        setCreditCardNumber(text);
+                      const expectedLength = getCardLength(creditCardType);
+                      // Only allow digits up to expected length
+                      const cleaned = text.replace(/\D/g, '');
+                      if (cleaned.length <= expectedLength) {
+                        setCreditCardNumber(cleaned);
                       }
                     }}
-                    placeholder="1234"
+                    placeholder={creditCardType === 'AMEX' ? '123456789012345' : '1234567890123456'}
                     keyboardType="number-pad"
-                    maxLength={4}
+                    maxLength={getCardLength(creditCardType)}
                   />
                   <Text style={styles.inputHint}>
-                    For security, we only store the last 4 digits
+                    {creditCardType === 'AMEX' ? '15 digits for AMEX' : '16 digits for VISA/Mastercard'}
                   </Text>
                 </View>
 
