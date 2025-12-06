@@ -16,7 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Vehicle, AddOn, NotificationPreferences, PriceBreakdown } from '../types';
 import { bookingAPI } from '../services/api';
 import { colors, gradients, financialFormatting } from '../theme/colors';
-import { MaterialIcons, Ionicons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 
 interface BookingScreenProps {
   navigation: any;
@@ -27,12 +27,10 @@ interface BookingScreenProps {
   };
 }
 
-// Default add-on services
+// Default add-on services (monthly rates)
 const DEFAULT_ADDONS: AddOn[] = [
-  { id: 'gps', name: 'GPS Navigation', description: 'GPS device with UAE maps', dailyRate: 25, totalAmount: 0, selected: false },
-  { id: 'child-seat', name: 'Child Safety Seat', description: 'Certified child car seat', dailyRate: 30, totalAmount: 0, selected: false },
-  { id: 'additional-driver', name: 'Additional Driver', description: 'Add one extra authorized driver', dailyRate: 50, totalAmount: 0, selected: false },
-  { id: 'insurance-upgrade', name: 'Premium Insurance', description: 'Zero deductible comprehensive coverage', dailyRate: 75, totalAmount: 0, selected: false },
+  { id: 'additional-driver', name: 'Additional Driver', description: 'Add one extra authorized driver', dailyRate: 100, totalAmount: 0, selected: false },
+  { id: 'insurance-upgrade', name: 'Premium Insurance', description: 'Zero deductible comprehensive coverage', dailyRate: 200, totalAmount: 0, selected: false },
 ];
 
 type RentalPeriodOption = '1_MONTH' | '3_MONTHS' | '6_MONTHS' | 'CUSTOM';
@@ -47,8 +45,7 @@ export default function BookingScreen({ navigation, route }: BookingScreenProps)
   const [isLoading, setIsLoading] = useState(false);
 
 
-  // Week 1 states
-  const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'CREDIT_CARD' | 'BANK_TRANSFER'>('CREDIT_CARD');
+  // State management
   const [termsAccepted, setTermsAccepted] = useState(false);
 
   // Week 3 states
@@ -136,11 +133,11 @@ export default function BookingScreen({ navigation, route }: BookingScreenProps)
 
   const rateCalculation = calculatePanelBasedRate();
 
-  // Calculate add-ons total
+  // Calculate add-ons total (monthly rates)
   const calculateAddOnsTotal = (): number => {
     return addOns
       .filter(addon => addon.selected)
-      .reduce((total, addon) => total + (addon.dailyRate * rateCalculation.totalDays), 0);
+      .reduce((total, addon) => total + (addon.dailyRate * rateCalculation.months), 0);
   };
 
   // Calculate complete price breakdown with VAT
@@ -150,14 +147,13 @@ export default function BookingScreen({ navigation, route }: BookingScreenProps)
     const subtotalWithAddons = subtotal + addOnsTotal;
     const vatAmount = financialFormatting.calculateVAT(subtotalWithAddons);
     const totalWithVat = subtotalWithAddons + vatAmount;
-    const securityDeposit = financialFormatting.calculateSecurityDeposit(totalWithVat);
 
     return {
       subtotal,
       vatRate: 5,
       vatAmount,
       totalWithVat,
-      securityDeposit,
+      securityDeposit: 0, // Security deposit removed
       addOnsTotal,
       grandTotal: totalWithVat,
     };
@@ -258,7 +254,7 @@ export default function BookingScreen({ navigation, route }: BookingScreenProps)
 
     const selectedAddOns = addOns.filter(addon => addon.selected);
     const addOnsText = selectedAddOns.length > 0
-      ? `\n\nAdd-ons:\n${selectedAddOns.map(a => `• ${a.name}: ${financialFormatting.formatCurrency(a.dailyRate)}/day`).join('\n')}`
+      ? `\n\nAdd-ons:\n${selectedAddOns.map(a => `• ${a.name}: ${financialFormatting.formatCurrency(a.dailyRate)}/month`).join('\n')}`
       : '';
 
     const periodLabel = selectedPeriod === '1_MONTH' ? '1 Month' :
@@ -271,9 +267,7 @@ export default function BookingScreen({ navigation, route }: BookingScreenProps)
       `Subtotal: ${financialFormatting.formatCurrency(priceBreakdown.subtotal)}\n` +
       `Add-ons: ${financialFormatting.formatCurrency(priceBreakdown.addOnsTotal || 0)}${addOnsText}\n` +
       `VAT (5%): ${financialFormatting.formatCurrency(priceBreakdown.vatAmount)}\n` +
-      `Total: ${financialFormatting.formatCurrency(priceBreakdown.totalWithVat)}\n\n` +
-      `Security Deposit: ${financialFormatting.formatCurrency(priceBreakdown.securityDeposit)}\n` +
-      `Payment Method: ${paymentMethod.replace('_', ' ')}`;
+      `Total: ${financialFormatting.formatCurrency(priceBreakdown.totalWithVat)}`;
 
     const confirmed = Platform.OS === 'web'
       ? window.confirm(confirmMessage)
@@ -299,10 +293,8 @@ export default function BookingScreen({ navigation, route }: BookingScreenProps)
                 endDate: endDate.toISOString(),
                 notes: `Booking for ${vehicle.make} ${vehicle.model} - ${periodLabel}\n` +
                        `Monthly Rate: ${financialFormatting.formatCurrency(rateCalculation.monthlyRate)}/month\n` +
-                       `Payment Method: ${paymentMethod}\n` +
                        `Add-ons: ${selectedAddOns.map(a => a.name).join(', ') || 'None'}\n` +
                        `Total with VAT: ${financialFormatting.formatCurrency(priceBreakdown.totalWithVat)}`,
-                paymentMethod,
                 termsAccepted,
                 addOns: selectedAddOns,
                 notificationPreferences: notificationPrefs,
@@ -589,54 +581,6 @@ export default function BookingScreen({ navigation, route }: BookingScreenProps)
         </View>
         )}
 
-        {/* Payment Method Selection */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Payment Method</Text>
-          <View style={styles.paymentContainer}>
-            <TouchableOpacity
-              style={[styles.paymentOption, paymentMethod === 'CASH' && styles.paymentOptionActive]}
-              onPress={() => setPaymentMethod('CASH')}
-            >
-              <Ionicons
-                name="cash-outline"
-                size={24}
-                color={paymentMethod === 'CASH' ? colors.primary.main : colors.neutral.text.secondary}
-              />
-              <Text style={[styles.paymentText, paymentMethod === 'CASH' && styles.paymentTextActive]}>
-                Cash
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.paymentOption, paymentMethod === 'CREDIT_CARD' && styles.paymentOptionActive]}
-              onPress={() => setPaymentMethod('CREDIT_CARD')}
-            >
-              <Ionicons
-                name="card-outline"
-                size={24}
-                color={paymentMethod === 'CREDIT_CARD' ? colors.primary.main : colors.neutral.text.secondary}
-              />
-              <Text style={[styles.paymentText, paymentMethod === 'CREDIT_CARD' && styles.paymentTextActive]}>
-                Credit Card
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.paymentOption, paymentMethod === 'BANK_TRANSFER' && styles.paymentOptionActive]}
-              onPress={() => setPaymentMethod('BANK_TRANSFER')}
-            >
-              <MaterialIcons
-                name="account-balance"
-                size={24}
-                color={paymentMethod === 'BANK_TRANSFER' ? colors.primary.main : colors.neutral.text.secondary}
-              />
-              <Text style={[styles.paymentText, paymentMethod === 'BANK_TRANSFER' && styles.paymentTextActive]}>
-                Bank Transfer
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
         {/* Add-on Services */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Add-on Services (Optional)</Text>
@@ -656,7 +600,7 @@ export default function BookingScreen({ navigation, route }: BookingScreenProps)
                 </View>
               </View>
               <Text style={styles.addonPrice}>
-                {financialFormatting.formatCurrency(addon.dailyRate)}/day
+                {financialFormatting.formatCurrency(addon.dailyRate)}/month
               </Text>
             </TouchableOpacity>
           ))}
@@ -758,17 +702,11 @@ export default function BookingScreen({ navigation, route }: BookingScreenProps)
               <Text style={styles.totalLabel}>Total Amount:</Text>
               <Text style={styles.totalValue}>{financialFormatting.formatCurrency(priceBreakdown.totalWithVat)}</Text>
             </View>
-
-            <View style={styles.depositRow}>
-              <Text style={styles.depositLabel}>Security Deposit (20%):</Text>
-              <Text style={styles.depositValue}>{financialFormatting.formatCurrency(priceBreakdown.securityDeposit)}</Text>
-            </View>
           </View>
 
           <View style={styles.infoBox}>
             <Text style={styles.infoTitle}>Important Information:</Text>
             <Text style={styles.infoText}>• Price includes 5% VAT as per UAE regulations</Text>
-            <Text style={styles.infoText}>• Security deposit will be refunded after vehicle return</Text>
             <Text style={styles.infoText}>• Additional charges may apply for late returns</Text>
             <Text style={styles.infoText}>• Fuel policy: Return with same fuel level</Text>
           </View>
